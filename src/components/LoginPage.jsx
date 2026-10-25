@@ -9,7 +9,8 @@ export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [referralCode, setReferralCode] = useState(''); // New state for referral
+  const [showPassword, setShowPassword] = useState(false); // New state for eye icon
+  const [referralCode, setReferralCode] = useState('');
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -25,7 +26,6 @@ export default function LoginPage() {
         }
         toast.success("Welcome back!");
       } else {
-        // Check if referral code is valid
         let referrerId = null;
         if (referralCode) {
           const q = query(collection(db, "users"), where("inviteCode", "==", referralCode.toUpperCase()));
@@ -37,9 +37,8 @@ export default function LoginPage() {
           }
         }
 
-        // Create User
         const userCred = await createUserWithEmailAndPassword(auth, email, password);
-        const myInviteCode = Math.random().toString(36).substring(2, 8).toUpperCase(); // Generate their own code
+        const myInviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
         
         await setDoc(doc(db, "users", userCred.user.uid), {
           email: email,
@@ -51,13 +50,12 @@ export default function LoginPage() {
           createdAt: new Date().toISOString()
         });
 
-        // Reward the referrer if valid
         if (referrerId) {
           const referrerRef = doc(db, "users", referrerId);
           const referrerSnap = await getDoc(referrerRef);
           if (referrerSnap.exists()) {
             const currentCoins = referrerSnap.data().coins || 0;
-            await updateDoc(referrerRef, { coins: currentCoins + 50 }); // Give 50 coins bonus
+            await updateDoc(referrerRef, { coins: currentCoins + 50 });
           }
         }
 
@@ -75,18 +73,34 @@ export default function LoginPage() {
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px', textAlign: 'left', marginTop: '20px' }}>
         <div>
           <label style={{ fontWeight: 'bold' }}>Email</label>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required style={{ width: '100%', padding: '12px', marginTop: '5px', borderRadius: '8px', border: '1px solid #ccc' }} />
-        </div>
-        <div>
-          <label style={{ fontWeight: 'bold' }}>Password</label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ width: '100%', padding: '12px', marginTop: '5px', borderRadius: '8px', border: '1px solid #ccc' }} />
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required style={{ width: '100%', padding: '12px', marginTop: '5px', borderRadius: '8px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
         </div>
         
-        {/* Referral Code Input (Only shows on Sign Up) */}
+        {/* PASSWORD INPUT WITH EYE ICON */}
+        <div>
+          <label style={{ fontWeight: 'bold' }}>Password</label>
+          <div style={{ position: 'relative', marginTop: '5px' }}>
+            <input 
+              type={showPassword ? "text" : "password"} 
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)} 
+              required 
+              style={{ width: '100%', padding: '12px', paddingRight: '40px', borderRadius: '8px', border: '1px solid #ccc', boxSizing: 'border-box' }} 
+            />
+            <button 
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px' }}
+            >
+              {showPassword ? '🙈' : '👁️'}
+            </button>
+          </div>
+        </div>
+        
         {!isLogin && (
           <div>
             <label style={{ fontWeight: 'bold' }}>Referral Code (Optional)</label>
-            <input type="text" value={referralCode} onChange={(e) => setReferralCode(e.target.value)} placeholder="Enter friend's code" style={{ width: '100%', padding: '12px', marginTop: '5px', borderRadius: '8px', border: '1px solid #ccc' }} />
+            <input type="text" value={referralCode} onChange={(e) => setReferralCode(e.target.value)} placeholder="Enter friend's code" style={{ width: '100%', padding: '12px', marginTop: '5px', borderRadius: '8px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
           </div>
         )}
 
