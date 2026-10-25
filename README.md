@@ -1,13 +1,21 @@
-# React + Vite
+# Coin Buying Platform & Casino Hub
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A full-stack web application developed during my internship at Root Solution. This platform allows users to purchase virtual coins via Ethiopian and International payment gateways, play casino mini-games, withdraw earnings to their bank accounts, and interact with an Admin support team.
 
-Currently, two official plugins are available:
+## 🚀 Key Features
+*   **Role-Based Access Control (RBAC):** Distinct interfaces for Users and Admins.
+*   **Fintech Integration:** Users can top up using TeleBirr/CBE and withdraw funds back to their accounts. Admin dashboard tracks total revenue and processes payouts.
+*   **Casino Hub:** 6 interactive mini-games (Coin Flip, Slots, Plinko, etc.) with real-time balance updates.
+*   **Live Chat Support:** Real-time messaging between users and admins using Firebase.
+*   **Admin Dashboard:** Full CMS to manage bank accounts, exchange rates, user bans, and transaction approvals.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🛠️ Technologies Used
+*   **Frontend:** React.js (Vite), React Router, Context API (Dark Mode)
+*   **Backend/Database:** Firebase (Authentication, Firestore, Base64 Image Storage)
+*   **Libraries:** `react-hot-toast` (Notifications), `jspdf` (PDF Receipts)
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
-# coin-buying-website
+## 👨‍💻 Developer
+**Syum Teame Gebreyesus**
+*   [Portfolio](https://syum-portfolio.netlify.app)
+*   [LinkedIn](https://linkedin.com/in/syumgebrel)
+*   [GitHub](https://github.com/syumgebrel)
