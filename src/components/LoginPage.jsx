@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { auth, db } from '../firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -9,7 +9,7 @@ export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false); // New state for eye icon
+  const [showPassword, setShowPassword] = useState(false);
   const [referralCode, setReferralCode] = useState('');
   const navigate = useNavigate();
 
@@ -19,12 +19,18 @@ export default function LoginPage() {
       if (isLogin) {
         const userCred = await signInWithEmailAndPassword(auth, email, password);
         const userDoc = await getDoc(doc(db, "users", userCred.user.uid));
+        
         if (userDoc.exists() && userDoc.data().isBanned) {
           await auth.signOut();
           toast.error("Your account has been banned.");
           return;
         }
-        toast.success("Welcome back!");
+
+        if (!userCred.user.emailVerified) {
+           toast.error("Please verify your email first.");
+        } else {
+           toast.success(`Welcome back, ${email.split('@')[0]}!`);
+        }
       } else {
         let referrerId = null;
         if (referralCode) {
@@ -38,6 +44,8 @@ export default function LoginPage() {
         }
 
         const userCred = await createUserWithEmailAndPassword(auth, email, password);
+        await sendEmailVerification(userCred.user);
+
         const myInviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
         
         await setDoc(doc(db, "users", userCred.user.uid), {
@@ -47,6 +55,7 @@ export default function LoginPage() {
           isBanned: false,
           inviteCode: myInviteCode,
           referredBy: referrerId || null,
+          hasChangedPassword: false, // NEW: Track if they changed their password
           createdAt: new Date().toISOString()
         });
 
@@ -59,11 +68,24 @@ export default function LoginPage() {
           }
         }
 
-        toast.success("Account created! You got a welcome bonus.");
+        toast.success(`Account created! Please check ${email} for a verification link.`);
       }
-      navigate('/');
+      navigate('/dashboard');
     } catch (err) {
       toast.error(err.message.replace("Firebase: ", ""));
+    }
+  };
+
+  // NEW: Handle Forgot Password
+  const handleForgotPassword = async () => {
+    if (!email) {
+      return toast.error("Please enter your email address first.");
+    }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast.success("Password reset link sent! Check your email.");
+    } catch (error) {
+      toast.error("Error sending reset email. Make sure the email is correct.");
     }
   };
 
@@ -76,7 +98,6 @@ export default function LoginPage() {
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required style={{ width: '100%', padding: '12px', marginTop: '5px', borderRadius: '8px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
         </div>
         
-        {/* PASSWORD INPUT WITH EYE ICON */}
         <div>
           <label style={{ fontWeight: 'bold' }}>Password</label>
           <div style={{ position: 'relative', marginTop: '5px' }}>
@@ -97,6 +118,14 @@ export default function LoginPage() {
           </div>
         </div>
         
+        {isLogin && (
+          <div style={{ textAlign: 'right' }}>
+            <span onClick={handleForgotPassword} style={{ color: '#d32f2f', fontSize: '13px', cursor: 'pointer', fontWeight: 'bold' }}>
+              Forgot Password?
+            </span>
+          </div>
+        )}
+
         {!isLogin && (
           <div>
             <label style={{ fontWeight: 'bold' }}>Referral Code (Optional)</label>

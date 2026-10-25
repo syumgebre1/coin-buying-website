@@ -10,13 +10,12 @@ export default function GetCoinsPage() {
   const [userCoins, setUserCoins] = useState(0);
   const [promoCode, setPromoCode] = useState('');
   const [lastCheckIn, setLastCheckIn] = useState(null);
-  const [coinRate, setCoinRate] = useState(10); // Dynamic rate
+  const [coinRate, setCoinRate] = useState(10);
   const { darkMode } = useContext(ThemeContext);
 
   useEffect(() => {
     if (!auth.currentUser) return;
 
-    // Listen for user balance updates
     const unsubscribeUser = onSnapshot(doc(db, "users", auth.currentUser.uid), (docSnap) => {
       if (docSnap.exists()) {
         setUserCoins(docSnap.data().coins || 0);
@@ -24,7 +23,6 @@ export default function GetCoinsPage() {
       }
     });
 
-    // Listen for rate changes (in case Admin changes it while user is on the page)
     const unsubscribeSettings = onSnapshot(doc(db, "settings", "config"), (docSnap) => {
       if (docSnap.exists()) {
         setCoinRate(docSnap.data().coinRate || 10);
@@ -59,7 +57,6 @@ export default function GetCoinsPage() {
   };
 
   const handleBuy = (coins) => {
-    // Calculate how many Birr it costs based on the live rate
     const costInBirr = coins / coinRate;
     localStorage.setItem('buyAmount', costInBirr);
     localStorage.setItem('buyCoins', coins);
@@ -102,14 +99,19 @@ export default function GetCoinsPage() {
         <h1 style={{ margin: '5px 0 0 0', fontSize: '36px' }}>🪙 {userCoins} <span style={{ fontSize: '16px' }}>Coins</span></h1>
       </div>
 
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-        <button onClick={() => navigate('/casino')} style={{ flex: 1, padding: '15px', backgroundColor: '#d32f2f', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
+      {/* QUICK ACTION BUTTONS */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+        <button onClick={() => navigate('/casino')} style={{ flex: 1, padding: '15px', backgroundColor: '#d32f2f', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>
           🎰 Casino
         </button>
-        <button onClick={handleDailyBonus} disabled={hasCheckedIn} style={{ flex: 1, padding: '15px', backgroundColor: hasCheckedIn ? '#9e9e9e' : '#4caf50', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: hasCheckedIn ? 'not-allowed' : 'pointer' }}>
-          {hasCheckedIn ? 'Claimed ✓' : 'Daily +20 🎁'}
+        <button onClick={() => navigate('/withdraw')} style={{ flex: 1, padding: '15px', backgroundColor: '#4caf50', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>
+          💸 Withdraw
+        </button>
+        <button onClick={handleDailyBonus} disabled={hasCheckedIn} style={{ flex: 1, padding: '15px', backgroundColor: hasCheckedIn ? '#9e9e9e' : '#f57c00', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: hasCheckedIn ? 'not-allowed' : 'pointer' }}>
+          {hasCheckedIn ? '✓' : '🎁 Bonus'}
         </button>
       </div>
+      <p style={{ fontSize: '11px', color: '#666', marginBottom: '20px' }}>Daily bonus gives 20 free coins.</p>
 
       <h2 style={{ color: textColor }}>Buy Coins</h2>
       <p style={{ fontSize: '12px', color: '#666', marginBottom: '15px' }}>Current Rate: 1 Birr = {coinRate} Coins</p>
@@ -133,7 +135,7 @@ export default function GetCoinsPage() {
         <h3 style={{ margin: '0 0 10px 0', color: textColor, fontSize: '16px' }}>Redeem Promo Code</h3>
         <div style={{ display: 'flex', gap: '10px' }}>
           <input type="text" placeholder="Enter code" value={promoCode} onChange={(e) => setPromoCode(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '4px', border: `1px solid ${cardBorder}`, backgroundColor: darkMode ? '#121212' : 'white', color: textColor }} />
-          <button onClick={redeemPromo} style={{ padding: '10px 20px', backgroundColor: '#f57c00', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Apply</button>
+          <button onClick={redeemPromo} style={{ padding: '10px 20px', backgroundColor: '#1a237e', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Apply</button>
         </div>
       </div>
     </div>

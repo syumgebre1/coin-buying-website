@@ -11,7 +11,7 @@ export default function AdminDashboard() {
   const [newBankName, setNewBankName] = useState('');
   const [newBankAccount, setNewBankAccount] = useState('');
   const [users, setUsers] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(''); // New search state
   const [transactions, setTransactions] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]); 
   const [promos, setPromos] = useState([]);
@@ -85,6 +85,7 @@ export default function AdminDashboard() {
     }
   };
 
+  // Filter users based on search
   const filteredUsers = users.filter(u => u.email.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const totalRevenue = transactions.filter(t => t.status === 'completed' && t.amount > 0 && !t.method.includes('Withdraw')).reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
@@ -177,7 +178,7 @@ export default function AdminDashboard() {
     <div style={{ maxWidth: '900px', margin: '0 auto', padding: '20px', textAlign: 'left' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
         <h2>Admin Dashboard</h2>
-        <button onClick={() => navigate('/')} style={{ padding: '10px', backgroundColor: '#1a237e', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Back to Site</button>
+        <button onClick={() => navigate('/dashboard')} style={{ padding: '10px', backgroundColor: '#1a237e', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Back to Site</button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
@@ -217,7 +218,6 @@ export default function AdminDashboard() {
             <button onClick={createPromo} style={{ padding: '10px', backgroundColor: '#f57c00', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Create</button>
           </div>
 
-          {/* PROMO CODE LIST */}
           <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
             <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
               <thead><tr style={{ borderBottom: '1px solid #ccc' }}><th>Code</th><th>Coins</th><th>Status</th><th>Action</th></tr></thead>

@@ -84,7 +84,7 @@ export default function CardPaymentForm() {
 
   return (
     <div style={{ maxWidth: '400px', margin: '0 auto', textAlign: 'left', paddingBottom: '40px' }}>
-      <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', marginBottom: '20px' }}>← Back</button>
+      <button onClick={() => navigate("/dashboard")} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', marginBottom: '20px' }}>← Back</button>
       <h2 style={{ textAlign: 'center' }}>Checkout</h2>
       
       <div style={{ backgroundColor: '#f5f5f5', padding: '15px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center', color: '#000' }}>

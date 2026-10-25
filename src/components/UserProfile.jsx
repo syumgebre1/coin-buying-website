@@ -31,7 +31,6 @@ export default function UserProfile() {
 
       setStats({ totalBets: bets.length, wins, losses });
 
-      // Fetch Withdrawals
       const wdQuery = query(collection(db, "withdrawals"), where("userId", "==", auth.currentUser.uid));
       const wdSnap = await getDocs(wdQuery);
       const wds = wdSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -49,6 +48,17 @@ export default function UserProfile() {
     }
   };
 
+  const shareReferral = () => {
+    if (!profile?.inviteCode) return;
+    const text = `Join me on Coin App and we both get bonuses! Use my code: ${profile.inviteCode}`;
+    if (navigator.share) {
+      navigator.share({ title: 'Coin App', text: text, url: window.location.origin });
+    } else {
+      navigator.clipboard.writeText(text);
+      toast.success("Referral message copied to clipboard!");
+    }
+  };
+
   const cardBg = darkMode ? '#1e1e1e' : 'white';
   const cardBorder = darkMode ? '#333' : '#ccc';
   const textColor = darkMode ? '#fff' : '#000';
@@ -60,15 +70,20 @@ export default function UserProfile() {
 
   return (
     <div style={{ maxWidth: '500px', margin: '0 auto', padding: '20px', color: textColor, position: 'relative' }}>
-      <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', marginBottom: '20px', color: textColor }}>← Back</button>
+      <button onClick={() => navigate('/dashboard')} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', marginBottom: '20px', color: textColor }}>← Back</button>
       
       <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-        <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#1a237e', color: 'white', fontSize: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 15px' }}>
+        <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: profile.isBanned ? '#d32f2f' : '#1a237e', color: 'white', fontSize: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 15px' }}>
           {profile.email.charAt(0).toUpperCase()}
         </div>
         <h2>{profile.email}</h2>
-        <p style={{ color: '#666' }}>Joined: {joinDate}</p>
-        {profile.role === 'admin' && <span style={{ backgroundColor: '#ffcdd2', color: '#b71c1c', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>ADMIN</span>}
+        <p style={{ color: '#666', margin: '5px 0' }}>Joined: {joinDate}</p>
+        
+        {/* BADGES */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+          {profile.role === 'admin' && <span style={{ backgroundColor: '#ffcdd2', color: '#b71c1c', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>ADMIN</span>}
+          {profile.isBanned && <span style={{ backgroundColor: '#d32f2f', color: 'white', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>BANNED</span>}
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
@@ -84,14 +99,16 @@ export default function UserProfile() {
 
       <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
         <button onClick={() => navigate('/withdraw')} style={{ flex: 1, padding: '15px', backgroundColor: '#d32f2f', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>
-          💸 Withdraw ETB
+          💸 Withdraw
         </button>
         <button onClick={() => setShowChat(!showChat)} style={{ flex: 1, padding: '15px', backgroundColor: '#4caf50', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>
-          💬 Support Chat
+          💬 Support
+        </button>
+        <button onClick={shareReferral} style={{ flex: 1, padding: '15px', backgroundColor: '#f57c00', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>
+          🎁 Share
         </button>
       </div>
 
-      {/* WITHDRAWAL TRACKER */}
       {withdrawals.length > 0 && (
         <div style={{ backgroundColor: cardBg, border: `1px solid ${cardBorder}`, padding: '20px', borderRadius: '12px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 15px 0' }}>Withdrawal Status</h3>
