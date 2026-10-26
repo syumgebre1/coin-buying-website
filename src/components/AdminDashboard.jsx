@@ -19,6 +19,12 @@ export default function AdminDashboard() {
   const [promos, setPromos] = useState([]);
   const [tickets, setTickets] = useState([]); 
   const [isMaintenance, setIsMaintenance] = useState(false);
+  const [marketPrices, setMarketPrices] = useState({
+    btc: { price: 4250000, change: "+2.4%" },
+    eth: { price: 110000, change: "+1.8%" },
+    gold: { price: 3800, change: "-0.5%" },
+    usd: { price: 57.50, change: "+0.1%" }
+  });
   
   const [chats, setChats] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -33,6 +39,7 @@ export default function AdminDashboard() {
       setCoinRate(data.coinRate || 10);
       setBanks(data.banks || []);
       setIsMaintenance(data.maintenance || false);
+      if (data.marketPrices) setMarketPrices(data.marketPrices);
     }
     
     const usersSnapshot = await getDocs(collection(db, "users"));
@@ -104,7 +111,7 @@ export default function AdminDashboard() {
   };
 
   const saveSettings = async () => {
-    await setDoc(doc(db, "settings", "config"), { coinRate, banks, maintenance: isMaintenance });
+    await setDoc(doc(db, "settings", "config"), { coinRate, banks, maintenance: isMaintenance, marketPrices }, { merge: true });
     toast.success('Settings saved!');
   };
 
@@ -320,7 +327,37 @@ export default function AdminDashboard() {
           
           <hr style={{ margin: '20px 0', borderTop: '1px solid #ddd' }} />
           
-          <h3>Create Promo Code</h3>
+                    <hr style={{ margin: '20px 0', borderTop: '1px solid #ddd' }} />
+          
+          <h3>📈 Live Market Ticker Settings</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: 'bold' }}>BTC Price (ETB)</label>
+              <input type="number" value={marketPrices.btc.price} onChange={(e) => setMarketPrices({...marketPrices, btc: {...marketPrices.btc, price: Number(e.target.value)}})} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: 'bold' }}>BTC Change (%)</label>
+              <input type="text" value={marketPrices.btc.change} onChange={(e) => setMarketPrices({...marketPrices, btc: {...marketPrices.btc, change: e.target.value}})} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: 'bold' }}>ETH Price (ETB)</label>
+              <input type="number" value={marketPrices.eth.price} onChange={(e) => setMarketPrices({...marketPrices, eth: {...marketPrices.eth, price: Number(e.target.value)}})} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: 'bold' }}>ETH Change (%)</label>
+              <input type="text" value={marketPrices.eth.change} onChange={(e) => setMarketPrices({...marketPrices, eth: {...marketPrices.eth, change: e.target.value}})} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Gold Price</label>
+              <input type="number" value={marketPrices.gold.price} onChange={(e) => setMarketPrices({...marketPrices, gold: {...marketPrices.gold, price: Number(e.target.value)}})} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: 'bold' }}>USD Price (ETB)</label>
+              <input type="number" value={marketPrices.usd.price} onChange={(e) => setMarketPrices({...marketPrices, usd: {...marketPrices.usd, price: Number(e.target.value)}})} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }} />
+            </div>
+          </div>
+
+<h3>Create Promo Code</h3>
           <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
             <input type="text" placeholder="Code" value={promoCode} onChange={(e) => setPromoCode(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '4px', border: '1px solid #ccc' }} />
             <input type="number" placeholder="Coins" value={promoCoins} onChange={(e) => setPromoCoins(e.target.value)} style={{ width: '80px', padding: '10px', borderRadius: '4px', border: '1px solid #ccc' }} />
