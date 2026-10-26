@@ -1,20 +1,18 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { db, auth } from '../firebase';
-import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { ThemeContext } from '../ThemeContext';
-import { useNavigate } from 'react-router-dom';
 
 export default function NotificationCenter() {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const { darkMode } = useContext(ThemeContext);
-  const navigate = useNavigate();
 
   useEffect(() => {
     if (!auth.currentUser) return;
 
-    // 1. Listen for specific user notifications (transfers, etc.)
+    // Listen for personal notifications (transfers)
     const qUser = query(
       collection(db, "notifications"), 
       where("userId", "==", auth.currentUser.uid),
@@ -23,15 +21,26 @@ export default function NotificationCenter() {
 
     const unsubscribeUser = onSnapshot(qUser, (snapshot) => {
       const notifs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      setNotifications(notifs);
+      // Only set notifications if we have personal ones, otherwise keep global
+      setNotifications(prev => {
+        const combined = [...prev.filter(n => n.type === 'global'), ...notifs];
+        return combined.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      });
+      // Count unread personal notifications
       setUnreadCount(notifs.filter(n => !n.read).length);
     });
 
-    // 2. Listen for global announcements
+    // Listen for global announcements
     const qGlobal = query(collection(db, "announcements"), orderBy("createdAt", "desc"));
     const unsubscribeGlobal = onSnapshot(qGlobal, (snapshot) => {
-      const globalNotifs = snapshot.docs.map(d => ({ id: d.id, type: 'global', message: d.data().message, createdAt: d.data().createdAt, read: false }));
-      // Merge and sort
+      const globalNotifs = snapshot.docs.map(d => ({ 
+        id: d.id, 
+        type: 'global', 
+        message: d.data().message, 
+        createdAt: d.data().createdAt, 
+        read: true // Global announcements don't trigger the red dot
+      }));
+      
       setNotifications(prev => {
         const combined = [...prev.filter(n => n.type !== 'global'), ...globalNotifs];
         return combined.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -41,14 +50,17 @@ export default function NotificationCenter() {
     return () => { unsubscribeUser(); unsubscribeGlobal(); };
   }, []);
 
-  const markAsRead = async () => {
+  const toggleOpen = async () => {
     setIsOpen(!isOpen);
-    // Update all unread specific notifications to read
-    const unreadIds = notifications.filter(n => !n.read && n.type !== 'global').map(n => n.id);
-    for (const id of unreadIds) {
-      await updateDoc(doc(db, "notifications", id), { read: true });
+    
+    // If opening, mark all personal notifications as read
+    if (!isOpen) {
+      const unreadIds = notifications.filter(n => !n.read && n.type !== 'global').map(n => n.id);
+      for (const id of unreadIds) {
+        await updateDoc(doc(db, "notifications", id), { read: true });
+      }
+      setUnreadCount(0);
     }
-    setUnreadCount(0);
   };
 
   const bg = darkMode ? '#1e1e1e' : 'white';
@@ -56,23 +68,48 @@ export default function NotificationCenter() {
   const border = darkMode ? '#333' : '#ccc';
 
   return (
-    <div style={{ position: 'relative' }}>
-      {/* Bell Icon */}
-      <button onClick={markAsRead} style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', position: 'relative', padding: '5px' }}>
+    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+      {/* Bell Icon with fixed size */}
+      <button 
+        onClick={toggleOpen} 
+        style={{ 
+          background: 'none', 
+          border: 'none', 
+          cursor: 'pointer', 
+          position: 'relative', 
+          padding: '8px', 
+          fontSize: '24px', // Fixed font size
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center' 
+        }}
+      >
         🔔
         {unreadCount > 0 && (
-          <span style={{ position: 'absolute', top: '0', right: '0', backgroundColor: '#d32f2f', color: 'white', fontSize: '10px', fontWeight: 'bold', padding: '2px 6px', borderRadius: '50%' }}>
+          <span style={{ 
+            position: 'absolute', 
+            top: '2px', 
+            right: '2px', 
+            backgroundColor: '#d32f2f', 
+            color: 'white', 
+            fontSize: '10px', 
+            fontWeight: 'bold', 
+            padding: '2px 5px', 
+            borderRadius: '50%',
+            minWidth: '16px',
+            textAlign: 'center'
+          }}>
             {unreadCount}
           </span>
         )}
       </button>
 
-      {/* Dropdown Menu */}
+      {/* Dropdown */}
       {isOpen && (
         <div style={{ position: 'absolute', top: '40px', right: '0', width: '300px', backgroundColor: bg, border: `1px solid ${border}`, borderRadius: '8px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)', zIndex: 2000, maxHeight: '400px', overflowY: 'auto' }}>
           <div style={{ padding: '15px', borderBottom: `1px solid ${border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h4 style={{ margin: 0, color: text }}>Notifications</h4>
-            <button onClick={() => setIsOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666' }}>✕</button>
+            <button onClick={() => setIsOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', fontSize: '16px' }}>✕</button>
           </div>
           
           {notifications.length === 0 ? (

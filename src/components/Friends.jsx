@@ -77,10 +77,10 @@ export default function Friends() {
         transaction.update(receiverRef, { coins: receiverBalance + amount });
       });
 
-      // Create a notification for the receiver
+      // CRITICAL FIX: Add the notification document to Firestore
       await addDoc(collection(db, "notifications"), {
         userId: selectedFriend.id,
-        message: `You received ${amount} coins from ${auth.currentUser.email}`,
+        message: `💸 You received ${amount} coins from ${auth.currentUser.email}`,
         type: 'transfer',
         read: false,
         createdAt: new Date().toISOString()
@@ -92,6 +92,7 @@ export default function Friends() {
       setSendAmount('');
       setSelectedFriend(null);
     } catch (e) {
+      console.error(e);
       toast.error(typeof e === 'string' ? e : "Transfer failed.");
     }
   };
