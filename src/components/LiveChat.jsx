@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../firebase';
-import { collection, addDoc, query, orderBy, limit, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, addDoc, query, orderBy, limit, onSnapshot, getDocs, doc, getDoc } from 'firebase/firestore';
 import { ThemeContext } from '../ThemeContext';
 import toast from 'react-hot-toast';
 
@@ -9,11 +9,17 @@ export default function LiveChat() {
   const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
+  const [myUsername, setMyUsername] = useState('');
   const { darkMode } = useContext(ThemeContext);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    // Listen to the last 50 messages
+    const fetchMyName = async () => {
+      const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+      if (userDoc.exists()) setMyUsername(userDoc.data().username || auth.currentUser.email.split('@')[0]);
+    };
+    fetchMyName();
+
     const q = query(collection(db, "global_chat"), orderBy("createdAt", "asc"), limit(50));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -30,15 +36,13 @@ export default function LiveChat() {
     if (!newMessage.trim()) return;
 
     try {
-      // 1. Send the chat message
       await addDoc(collection(db, "global_chat"), {
         text: newMessage,
         userId: auth.currentUser.uid,
-        userEmail: auth.currentUser.email,
+        username: myUsername, // Save username instead of email
         createdAt: new Date().toISOString()
       });
 
-      // 2. Send a notification to everyone EXCEPT the sender
       const usersSnapshot = await getDocs(collection(db, "users"));
       const notificationPromises = [];
       
@@ -47,7 +51,7 @@ export default function LiveChat() {
           notificationPromises.push(
             addDoc(collection(db, "notifications"), {
               userId: userDoc.id,
-              message: `💬 New message in Lobby from ${auth.currentUser.email.split('@')[0]}: "${newMessage}"`,
+              message: `💬 New message in Lobby from ${myUsername}: "${newMessage}"`,
               type: 'lobby',
               read: false,
               createdAt: new Date().toISOString()
@@ -57,7 +61,6 @@ export default function LiveChat() {
       });
       
       await Promise.all(notificationPromises);
-
       setNewMessage('');
     } catch (error) {
       toast.error("Failed to send message.");
@@ -83,7 +86,7 @@ export default function LiveChat() {
           return (
             <div key={msg.id} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
               <div style={{ fontSize: '10px', color: '#888', marginBottom: '2px', textAlign: isMe ? 'right' : 'left' }}>
-                {isMe ? 'You' : msg.userEmail.split('@')[0]}
+                {isMe ? 'You' : (msg.username || msg.userEmail?.split('@')[0])} {/* Fallback for old messages */}
               </div>
               <div style={{ backgroundColor: isMe ? '#1a237e' : (darkMode ? '#333' : '#f0f0f0'), color: isMe ? 'white' : text, padding: '10px 15px', borderRadius: '15px', borderBottomRightRadius: isMe ? '0' : '15px', borderBottomLeftRadius: isMe ? '15px' : '0', fontSize: '14px' }}>
                 {msg.text}
@@ -95,13 +98,7 @@ export default function LiveChat() {
       </div>
 
       <form onSubmit={sendMessage} style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
-        <input 
-          type="text" 
-          value={newMessage} 
-          onChange={(e) => setNewMessage(e.target.value)} 
-          placeholder="Say something nice..." 
-          style={{ flex: 1, padding: '12px', borderRadius: '20px', border: `1px solid ${border}`, backgroundColor: bg, color: text, outline: 'none' }} 
-        />
+        <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Say something nice..." style={{ flex: 1, padding: '12px', borderRadius: '20px', border: `1px solid ${border}`, backgroundColor: bg, color: text, outline: 'none' }} />
         <button type="submit" style={{ padding: '12px 20px', backgroundColor: '#f57c00', color: 'white', border: 'none', borderRadius: '20px', fontWeight: 'bold', cursor: 'pointer' }}>Send</button>
       </form>
     </div>

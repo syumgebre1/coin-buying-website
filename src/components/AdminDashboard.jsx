@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { db, auth } from '../firebase'; // Make sure auth is imported
+import { db, auth } from '../firebase';
 import { collection, getDocs, doc, setDoc, getDoc, updateDoc, deleteDoc, addDoc, query, orderBy, onSnapshot, where } from 'firebase/firestore';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { fireConfetti } from '../utils/confetti';
@@ -180,9 +180,10 @@ export default function AdminDashboard() {
         await updateDoc(userRef, { coins: currentCoins + tx.coins });
         await updateDoc(doc(db, "transactions", tx.id), { status: 'completed' });
         
+        // Send notification with Admin's email
         await addDoc(collection(db, "notifications"), {
           userId: tx.userId,
-          message: `✅ Your deposit of ${tx.coins} Coins was approved!`,
+          message: `✅ Your deposit of ${tx.coins} Coins was approved by Admin (${auth.currentUser.email})`,
           type: 'deposit',
           read: false,
           createdAt: new Date().toISOString()
@@ -198,6 +199,16 @@ export default function AdminDashboard() {
 
   const rejectTx = async (tx) => {
     await updateDoc(doc(db, "transactions", tx.id), { status: 'rejected' });
+    
+    // Notify user of rejection
+    await addDoc(collection(db, "notifications"), {
+      userId: tx.userId,
+      message: `❌ Your deposit of ${tx.coins} Coins was rejected by Admin (${auth.currentUser.email})`,
+      type: 'deposit',
+      read: false,
+      createdAt: new Date().toISOString()
+    });
+    
     toast.error("Transaction rejected.");
     fetchData();
   };
@@ -225,6 +236,15 @@ export default function AdminDashboard() {
       }
     } catch(e) { console.log(e); }
 
+    // Notify user of withdrawal status
+    await addDoc(collection(db, "notifications"), {
+      userId: wd.userId,
+      message: `💸 Your withdrawal of ${wd.coinsDeducted} Coins (${wd.etbAmount} Birr) was marked as ${status.toUpperCase()} by Admin (${auth.currentUser.email})`,
+      type: 'withdrawal',
+      read: false,
+      createdAt: new Date().toISOString()
+    });
+
     toast.success(`Withdrawal marked as ${status}.`);
     fetchData();
   };
@@ -245,12 +265,11 @@ export default function AdminDashboard() {
   const totalCoinsSold = transactions.filter(t => t.status === 'completed' && t.amount > 0 && !t.method.includes('Withdraw')).reduce((sum, t) => sum + (Number(t.coins) || 0), 0);
   const chartData = transactions.filter(t => t.status === 'completed' && t.amount > 0).slice(0, 10).reverse().map((tx, i) => ({ name: `Tx ${i+1}`, revenue: tx.amount }));
 
-  // **SECURITY FIX**: Filter out the Admin's own pending transactions
   const pendingTransactions = transactions.filter(tx => 
     tx.status === 'pending' && 
     tx.amount > 0 && 
     !tx.method.includes('Withdraw') &&
-    tx.userId !== auth.currentUser?.uid // <--- The Admin cannot see their own deposits here
+    tx.userId !== auth.currentUser?.uid
   );
 
   return (

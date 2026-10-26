@@ -8,18 +8,16 @@ export default function Leaderboard() {
   const navigate = useNavigate();
   const [topUsers, setTopUsers] = useState([]);
   const [topWinners, setTopWinners] = useState([]);
-  const [activeTab, setActiveTab] = useState('richest'); // 'richest' or 'winners'
+  const [activeTab, setActiveTab] = useState('richest');
   const { darkMode } = useContext(ThemeContext);
 
   useEffect(() => {
     const fetchData = async () => {
-      // 1. Fetch Richest Users
       const usersSnap = await getDocs(collection(db, "users"));
       const users = usersSnap.docs.map(d => d.data());
       const sortedUsers = users.sort((a, b) => (b.coins || 0) - (a.coins || 0)).slice(0, 10);
       setTopUsers(sortedUsers);
 
-      // 2. Fetch Top Winners (Based on Total Wins in Transactions)
       const txSnap = await getDocs(collection(db, "transactions"));
       const txs = txSnap.docs.map(d => d.data());
       
@@ -29,7 +27,11 @@ export default function Leaderboard() {
       });
 
       const sortedWinners = Object.keys(winCounts)
-        .map(email => ({ email, wins: winCounts[email] }))
+        .map(email => {
+          // Find username for this email
+          const user = users.find(u => u.email === email);
+          return { username: user?.username || email.split('@')[0], wins: winCounts[email] };
+        })
         .sort((a, b) => b.wins - a.wins)
         .slice(0, 10);
       
@@ -51,20 +53,9 @@ export default function Leaderboard() {
         <h2>Global Leaderboard</h2>
       </div>
 
-      {/* TABS */}
       <div style={{ display: 'flex', marginBottom: '20px', borderBottom: `1px solid ${cardBorder}` }}>
-        <button 
-          onClick={() => setActiveTab('richest')} 
-          style={{ flex: 1, padding: '10px', background: 'none', border: 'none', borderBottom: activeTab === 'richest' ? '3px solid #1a237e' : 'none', color: activeTab === 'richest' ? '#1a237e' : '#666', fontWeight: 'bold', cursor: 'pointer' }}
-        >
-          💰 Richest Players
-        </button>
-        <button 
-          onClick={() => setActiveTab('winners')} 
-          style={{ flex: 1, padding: '10px', background: 'none', border: 'none', borderBottom: activeTab === 'winners' ? '3px solid #f57c00' : 'none', color: activeTab === 'winners' ? '#f57c00' : '#666', fontWeight: 'bold', cursor: 'pointer' }}
-        >
-          🎰 Top Casino Winners
-        </button>
+        <button onClick={() => setActiveTab('richest')} style={{ flex: 1, padding: '10px', background: 'none', border: 'none', borderBottom: activeTab === 'richest' ? '3px solid #1a237e' : 'none', color: activeTab === 'richest' ? '#1a237e' : '#666', fontWeight: 'bold', cursor: 'pointer' }}>💰 Richest</button>
+        <button onClick={() => setActiveTab('winners')} style={{ flex: 1, padding: '10px', background: 'none', border: 'none', borderBottom: activeTab === 'winners' ? '3px solid #f57c00' : 'none', color: activeTab === 'winners' ? '#f57c00' : '#666', fontWeight: 'bold', cursor: 'pointer' }}>🎰 Top Winners</button>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -73,7 +64,7 @@ export default function Leaderboard() {
             <div key={index} style={{ display: 'flex', alignItems: 'center', backgroundColor: cardBg, border: `1px solid ${cardBorder}`, padding: '15px', borderRadius: '12px' }}>
               <div style={{ width: '30px', fontSize: '18px', fontWeight: 'bold', color: index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? '#cd7f32' : textColor }}>#{index + 1}</div>
               <div style={{ flex: 1, marginLeft: '10px' }}>
-                <strong style={{ display: 'block', fontSize: '14px' }}>{user.email.split('@')[0]}</strong>
+                <strong style={{ display: 'block', fontSize: '14px' }}>{user.username || user.email.split('@')[0]}</strong>
               </div>
               <div style={{ fontWeight: 'bold', color: '#f57c00' }}>🪙 {user.coins || 0}</div>
             </div>
@@ -83,7 +74,7 @@ export default function Leaderboard() {
             <div key={index} style={{ display: 'flex', alignItems: 'center', backgroundColor: cardBg, border: `1px solid ${cardBorder}`, padding: '15px', borderRadius: '12px' }}>
               <div style={{ width: '30px', fontSize: '18px', fontWeight: 'bold', color: index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? '#cd7f32' : textColor }}>#{index + 1}</div>
               <div style={{ flex: 1, marginLeft: '10px' }}>
-                <strong style={{ display: 'block', fontSize: '14px' }}>{user.email.split('@')[0]}</strong>
+                <strong style={{ display: 'block', fontSize: '14px' }}>{user.username}</strong>
               </div>
               <div style={{ fontWeight: 'bold', color: '#4caf50' }}>🏆 {user.wins} Wins</div>
             </div>

@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { auth, db } from '../firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState(''); // Can be email or username
   const [password, setPassword] = useState('');
+  const [username, setUsername] = useState(''); // For sign up
+  const [email, setEmail] = useState(''); // For sign up
   const [showPassword, setShowPassword] = useState(false);
   const [referralCode, setReferralCode] = useState('');
   const navigate = useNavigate();
@@ -17,7 +19,20 @@ export default function LoginPage() {
     e.preventDefault();
     try {
       if (isLogin) {
-        const userCred = await signInWithEmailAndPassword(auth, email, password);
+        let loginEmail = identifier;
+
+        // If the identifier does not include '@', it's a username. Look up the email.
+        if (!identifier.includes('@')) {
+          const q = query(collection(db, "users"), where("username", "==", identifier.toLowerCase()));
+          const snap = await getDocs(q);
+          
+          if (snap.empty) {
+            return toast.error("Username not found.");
+          }
+          loginEmail = snap.docs[0].data().email;
+        }
+
+        const userCred = await signInWithEmailAndPassword(auth, loginEmail, password);
         const userDoc = await getDoc(doc(db, "users", userCred.user.uid));
         
         if (userDoc.exists() && userDoc.data().isBanned) {
@@ -29,9 +44,18 @@ export default function LoginPage() {
         if (!userCred.user.emailVerified) {
            toast.error("Please verify your email first.");
         } else {
-           toast.success(`Welcome back, ${email.split('@')[0]}!`);
+           toast.success(`Welcome back!`);
         }
       } else {
+        // SIGN UP LOGIC
+        if (!username.trim()) return toast.error("Please enter a username.");
+        if (!email.includes('@')) return toast.error("Please enter a valid email.");
+        
+        // Check if username is already taken
+        const userQuery = query(collection(db, "users"), where("username", "==", username.toLowerCase()));
+        const userSnap = await getDocs(userQuery);
+        if (!userSnap.empty) return toast.error("Username is already taken.");
+
         let referrerId = null;
         if (referralCode) {
           const q = query(collection(db, "users"), where("inviteCode", "==", referralCode.toUpperCase()));
@@ -50,12 +74,13 @@ export default function LoginPage() {
         
         await setDoc(doc(db, "users", userCred.user.uid), {
           email: email,
+          username: username.toLowerCase(),
           role: "user",
           coins: 0,
           isBanned: false,
           inviteCode: myInviteCode,
           referredBy: referrerId || null,
-          hasChangedPassword: false, // NEW: Track if they changed their password
+          hasChangedPassword: true,
           createdAt: new Date().toISOString()
         });
 
@@ -68,7 +93,7 @@ export default function LoginPage() {
           }
         }
 
-        toast.success(`Account created! Please check ${email} for a verification link.`);
+        toast.success(`Account created! Check ${email} to verify.`);
       }
       navigate('/dashboard');
     } catch (err) {
@@ -76,16 +101,15 @@ export default function LoginPage() {
     }
   };
 
-  // NEW: Handle Forgot Password
   const handleForgotPassword = async () => {
-    if (!email) {
-      return toast.error("Please enter your email address first.");
+    if (!identifier.includes('@')) {
+      return toast.error("Please enter your full email address to reset password.");
     }
     try {
-      await sendPasswordResetEmail(auth, email);
+      await sendPasswordResetEmail(auth, identifier);
       toast.success("Password reset link sent! Check your email.");
     } catch (error) {
-      toast.error("Error sending reset email. Make sure the email is correct.");
+      toast.error("Error sending reset email.");
     }
   };
 
@@ -93,26 +117,30 @@ export default function LoginPage() {
     <div style={{ maxWidth: '400px', margin: '60px auto', padding: '20px', textAlign: 'center', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', color: '#000' }}>
       <h2>{isLogin ? 'Welcome Back' : 'Create an Account'}</h2>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px', textAlign: 'left', marginTop: '20px' }}>
-        <div>
-          <label style={{ fontWeight: 'bold' }}>Email</label>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required style={{ width: '100%', padding: '12px', marginTop: '5px', borderRadius: '8px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
-        </div>
+        
+        {!isLogin ? (
+          <>
+            <div>
+              <label style={{ fontWeight: 'bold' }}>Username</label>
+              <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="e.g. syum_teame" style={{ width: '100%', padding: '12px', marginTop: '5px', borderRadius: '8px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <label style={{ fontWeight: 'bold' }}>Email</label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required style={{ width: '100%', padding: '12px', marginTop: '5px', borderRadius: '8px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
+            </div>
+          </>
+        ) : (
+          <div>
+            <label style={{ fontWeight: 'bold' }}>Email or Username</label>
+            <input type="text" value={identifier} onChange={(e) => setIdentifier(e.target.value)} required placeholder="Enter email or username" style={{ width: '100%', padding: '12px', marginTop: '5px', borderRadius: '8px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
+          </div>
+        )}
         
         <div>
           <label style={{ fontWeight: 'bold' }}>Password</label>
           <div style={{ position: 'relative', marginTop: '5px' }}>
-            <input 
-              type={showPassword ? "text" : "password"} 
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)} 
-              required 
-              style={{ width: '100%', padding: '12px', paddingRight: '40px', borderRadius: '8px', border: '1px solid #ccc', boxSizing: 'border-box' }} 
-            />
-            <button 
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px' }}
-            >
+            <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} required style={{ width: '100%', padding: '12px', paddingRight: '40px', borderRadius: '8px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
+            <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px' }}>
               {showPassword ? '🙈' : '👁️'}
             </button>
           </div>
@@ -120,9 +148,7 @@ export default function LoginPage() {
         
         {isLogin && (
           <div style={{ textAlign: 'right' }}>
-            <span onClick={handleForgotPassword} style={{ color: '#d32f2f', fontSize: '13px', cursor: 'pointer', fontWeight: 'bold' }}>
-              Forgot Password?
-            </span>
+            <span onClick={handleForgotPassword} style={{ color: '#d32f2f', fontSize: '13px', cursor: 'pointer', fontWeight: 'bold' }}>Forgot Password?</span>
           </div>
         )}
 
