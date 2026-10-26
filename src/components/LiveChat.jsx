@@ -39,10 +39,11 @@ export default function LiveChat() {
       await addDoc(collection(db, "global_chat"), {
         text: newMessage,
         userId: auth.currentUser.uid,
-        username: myUsername, // Save username instead of email
+        username: myUsername,
         createdAt: new Date().toISOString()
       });
 
+      // Notify everyone EXCEPT the sender
       const usersSnapshot = await getDocs(collection(db, "users"));
       const notificationPromises = [];
       
@@ -63,7 +64,7 @@ export default function LiveChat() {
       await Promise.all(notificationPromises);
       setNewMessage('');
     } catch (error) {
-      toast.error("Failed to send message.");
+        toast.error("Failed to send message.");
     }
   };
 
@@ -77,7 +78,6 @@ export default function LiveChat() {
       
       <div style={{ backgroundColor: '#1a237e', color: 'white', padding: '15px', borderRadius: '8px', textAlign: 'center', marginBottom: '15px' }}>
         <h2 style={{ margin: 0 }}>💬 Global Lobby</h2>
-        <p style={{ margin: '5px 0 0 0', fontSize: '12px', opacity: 0.8 }}>Chat with everyone in the SYUM BET community!</p>
       </div>
 
       <div style={{ flex: 1, backgroundColor: bg, border: `1px solid ${border}`, borderRadius: '8px', padding: '15px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -86,7 +86,7 @@ export default function LiveChat() {
           return (
             <div key={msg.id} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
               <div style={{ fontSize: '10px', color: '#888', marginBottom: '2px', textAlign: isMe ? 'right' : 'left' }}>
-                {isMe ? 'You' : (msg.username || msg.userEmail?.split('@')[0])} {/* Fallback for old messages */}
+                {isMe ? 'You' : (msg.username || msg.userEmail?.split('@')[0])}
               </div>
               <div style={{ backgroundColor: isMe ? '#1a237e' : (darkMode ? '#333' : '#f0f0f0'), color: isMe ? 'white' : text, padding: '10px 15px', borderRadius: '15px', borderBottomRightRadius: isMe ? '0' : '15px', borderBottomLeftRadius: isMe ? '15px' : '0', fontSize: '14px' }}>
                 {msg.text}
