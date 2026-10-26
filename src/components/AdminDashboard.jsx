@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { db } from '../firebase';
+import { db, auth } from '../firebase'; // Make sure auth is imported
 import { collection, getDocs, doc, setDoc, getDoc, updateDoc, deleteDoc, addDoc, query, orderBy, onSnapshot, where } from 'firebase/firestore';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { fireConfetti } from '../utils/confetti';
@@ -19,18 +19,19 @@ export default function AdminDashboard() {
   const [promos, setPromos] = useState([]);
   const [tickets, setTickets] = useState([]); 
   const [isMaintenance, setIsMaintenance] = useState(false);
-  const [marketPrices, setMarketPrices] = useState({
-    btc: { price: 4250000, change: "+2.4%" },
-    eth: { price: 110000, change: "+1.8%" },
-    gold: { price: 3800, change: "-0.5%" },
-    usd: { price: 57.50, change: "+0.1%" }
-  });
   
   const [chats, setChats] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [replyText, setReplyText] = useState('');
   const [promoCode, setPromoCode] = useState('');
   const [promoCoins, setPromoCoins] = useState(50);
+
+  const [marketPrices, setMarketPrices] = useState({
+    btc: { price: 4250000, change: "+2.4%" },
+    eth: { price: 110000, change: "+1.8%" },
+    gold: { price: 3800, change: "-0.5%" },
+    usd: { price: 57.50, change: "+0.1%" }
+  });
 
   const fetchData = async () => {
     const settingsDoc = await getDoc(doc(db, "settings", "config"));
@@ -69,26 +70,10 @@ export default function AdminDashboard() {
     return () => unsub();
   }, []);
 
-  // --- FUNCTIONS (Restored) ---
-
-  const testNotification = async () => {
-    if(!auth.currentUser) return;
-    await addDoc(collection(db, "notifications"), {
-      userId: auth.currentUser.uid,
-      message: "🔔 Test Notification! This is working!",
-      type: "test",
-      read: false,
-      createdAt: new Date().toISOString()
-    });
-    toast.success("Test notification sent!");
-  };
-
   const sendAnnouncement = async () => {
     const msg = prompt("Enter announcement message for all users:");
     if (msg) {
       await addDoc(collection(db, "announcements"), { message: msg, createdAt: new Date().toISOString() });
-      
-      // Send a personal notification to EVERY user so the red dot appears
       const usersSnapshot = await getDocs(collection(db, "users"));
       for (const userDoc of usersSnapshot.docs) {
         await addDoc(collection(db, "notifications"), {
@@ -255,19 +240,25 @@ export default function AdminDashboard() {
     newTab.document.write(`<img src="${base64Data}" style="max-width: 100%;" />`);
   };
 
-  // --- CALCULATIONS ---
   const filteredUsers = users.filter(u => u.email.toLowerCase().includes(searchQuery.toLowerCase()));
   const totalRevenue = transactions.filter(t => t.status === 'completed' && t.amount > 0 && !t.method.includes('Withdraw')).reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
   const totalCoinsSold = transactions.filter(t => t.status === 'completed' && t.amount > 0 && !t.method.includes('Withdraw')).reduce((sum, t) => sum + (Number(t.coins) || 0), 0);
   const chartData = transactions.filter(t => t.status === 'completed' && t.amount > 0).slice(0, 10).reverse().map((tx, i) => ({ name: `Tx ${i+1}`, revenue: tx.amount }));
+
+  // **SECURITY FIX**: Filter out the Admin's own pending transactions
+  const pendingTransactions = transactions.filter(tx => 
+    tx.status === 'pending' && 
+    tx.amount > 0 && 
+    !tx.method.includes('Withdraw') &&
+    tx.userId !== auth.currentUser?.uid // <--- The Admin cannot see their own deposits here
+  );
 
   return (
     <div style={{ maxWidth: '900px', margin: '0 auto', padding: '20px', textAlign: 'left' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
         <div>
           <h2 style={{ margin: 0 }}>Admin Dashboard</h2>
-          <button onClick={sendAnnouncement} style={{ marginTop: "5px", padding: "5px 10px", backgroundColor: "#f57c00", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "12px" }}>📢 Send Announcement</button>
-          <button onClick={testNotification} style={{ marginTop: "5px", marginLeft: "5px", padding: "5px 10px", backgroundColor: "#d32f2f", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "12px" }}>🔔 Test Bell</button>
+          <button onClick={sendAnnouncement} style={{ marginTop: '5px', padding: '5px 10px', backgroundColor: '#f57c00', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>📢 Send Announcement</button>
         </div>
         <button onClick={() => navigate('/dashboard')} style={{ padding: '10px', backgroundColor: '#1a237e', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Back to Site</button>
       </div>
@@ -327,8 +318,6 @@ export default function AdminDashboard() {
           
           <hr style={{ margin: '20px 0', borderTop: '1px solid #ddd' }} />
           
-                    <hr style={{ margin: '20px 0', borderTop: '1px solid #ddd' }} />
-          
           <h3>📈 Live Market Ticker Settings</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
             <div>
@@ -357,7 +346,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-<h3>Create Promo Code</h3>
+          <h3>Create Promo Code</h3>
           <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
             <input type="text" placeholder="Code" value={promoCode} onChange={(e) => setPromoCode(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '4px', border: '1px solid #ccc' }} />
             <input type="number" placeholder="Coins" value={promoCoins} onChange={(e) => setPromoCoins(e.target.value)} style={{ width: '80px', padding: '10px', borderRadius: '4px', border: '1px solid #ccc' }} />
@@ -434,27 +423,31 @@ export default function AdminDashboard() {
       </div>
 
       <div style={{ border: '1px solid #ddd', padding: '20px', borderRadius: '8px', maxHeight: '400px', overflowY: 'auto', marginBottom: '20px' }}>
-        <h3>Pending Transactions</h3>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-          <thead><tr style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}><th>User</th><th>Method</th><th>Amount</th><th>Receipt</th><th>Status</th><th>Action</th></tr></thead>
-          <tbody>
-            {transactions.filter(tx => tx.status === 'pending' && tx.amount > 0 && !tx.method.includes('Withdraw')).map(tx => (
-              <tr key={tx.id} style={{ borderBottom: '1px solid #eee' }}>
-                <td>{tx.userEmail}</td>
-                <td>{tx.method}</td>
-                <td>{tx.amount} Birr ({tx.coins} Coins)</td>
-                <td>{tx.receiptUrl ? <button onClick={() => viewReceipt(tx.receiptUrl)} style={{ background: 'none', border: 'none', color: '#1a237e', fontWeight: 'bold', cursor: 'pointer', textDecoration: 'underline' }}>View</button> : <span>None</span>}</td>
-                <td><span style={{ padding: '3px 8px', borderRadius: '10px', fontSize: '12px', backgroundColor: '#fff3e0', color: '#ef6c00' }}>{tx.status}</span></td>
-                <td>
-                  <div style={{ display: 'flex', gap: '5px' }}>
-                    <button onClick={() => approveTx(tx)} style={{ padding: '5px', backgroundColor: '#4caf50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Approve</button>
-                    <button onClick={() => rejectTx(tx)} style={{ padding: '5px', backgroundColor: '#d32f2f', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Reject</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <h3>Pending Transactions ({pendingTransactions.length})</h3>
+        {pendingTransactions.length === 0 ? (
+          <p style={{ fontSize: '12px', color: '#666' }}>No pending transactions to approve. (If you deposited as Admin, you cannot approve your own deposit. Log in with a different Admin account).</p>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+            <thead><tr style={{ borderBottom: '1px solid #ccc', textAlign: 'left' }}><th>User</th><th>Method</th><th>Amount</th><th>Receipt</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody>
+              {pendingTransactions.map(tx => (
+                <tr key={tx.id} style={{ borderBottom: '1px solid #eee' }}>
+                  <td>{tx.userEmail}</td>
+                  <td>{tx.method}</td>
+                  <td>{tx.amount} Birr ({tx.coins} Coins)</td>
+                  <td>{tx.receiptUrl ? <button onClick={() => viewReceipt(tx.receiptUrl)} style={{ background: 'none', border: 'none', color: '#1a237e', fontWeight: 'bold', cursor: 'pointer', textDecoration: 'underline' }}>View</button> : <span>None</span>}</td>
+                  <td><span style={{ padding: '3px 8px', borderRadius: '10px', fontSize: '12px', backgroundColor: '#fff3e0', color: '#ef6c00' }}>{tx.status}</span></td>
+                  <td>
+                    <div style={{ display: 'flex', gap: '5px' }}>
+                      <button onClick={() => approveTx(tx)} style={{ padding: '5px', backgroundColor: '#4caf50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Approve</button>
+                      <button onClick={() => rejectTx(tx)} style={{ padding: '5px', backgroundColor: '#d32f2f', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Reject</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
