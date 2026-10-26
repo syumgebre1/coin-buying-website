@@ -25,8 +25,8 @@ import ForcePasswordChange from './components/ForcePasswordChange';
 import Missions from './components/Missions';
 import Lottery from './components/Lottery';
 import Friends from './components/Friends';
-import NotificationCenter from "./components/NotificationCenter";
 import LiveChat from './components/LiveChat';
+import NotificationCenter from './components/NotificationCenter';
 import './App.css';
 
 function ProtectedRoute({ user, children }) {
@@ -44,7 +44,6 @@ function AppContent() {
   const [user, setUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [timeoutReached, setTimeoutReached] = useState(false);
   const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
   const [isMaintenance, setIsMaintenance] = useState(false);
   const [lastAnnouncement, setLastAnnouncement] = useState('');
@@ -63,14 +62,6 @@ function AppContent() {
   const isMobile = windowWidth <= 768;
   useEffect(() => { setIsMobileMenuOpen(false); }, [location.pathname]);
 
-  // Timeout logic
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (loading) setTimeoutReached(true);
-    }, 5000); // 5 seconds
-    return () => clearTimeout(timer);
-  }, [loading]);
-
   useEffect(() => {
     let unsubDoc = null;
     let unsubSettings = null;
@@ -84,9 +75,6 @@ function AppContent() {
             setIsAdmin(data.role === 'admin');
             setNeedsPasswordChange(data.hasChangedPassword === false);
           }
-        }, (error) => {
-          console.error("Error fetching user data:", error);
-          setLoading(false); // Force stop loading if error
         });
       } else {
         setIsAdmin(false);
@@ -124,12 +112,6 @@ function AppContent() {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: darkMode ? '#121212' : '#f5f5f5', color: darkMode ? 'white' : 'black' }}>
         <h2>Loading SYUM BET...</h2>
         <div style={{ width: '40px', height: '40px', border: '4px solid #ccc', borderTop: '4px solid #1a237e', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '20px 0' }}></div>
-        {timeoutReached && (
-          <div style={{ textAlign: 'center' }}>
-            <p>Taking longer than usual. Check your connection.</p>
-            <button onClick={() => window.location.reload()} style={{ padding: '10px 20px', backgroundColor: '#1a237e', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Reload Page</button>
-          </div>
-        )}
       </div>
     );
   }
@@ -158,10 +140,13 @@ function AppContent() {
   return (
     <div className="app-container" style={{ display: 'flex', minHeight: '100vh', color: darkMode ? '#fff' : '#000' }}>
       
+      {/* MOBILE TOP BAR - Added Notification Center back here */}
       {showNav && isMobile && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: '60px', backgroundColor: navBg, borderBottom: `1px solid ${navBorder}`, zIndex: 900, display: 'flex', alignItems: 'center', padding: '0 20px', justifyContent: 'space-between' }}>
-          <h2 style={{ margin: 0, color: '#1a237e', fontSize: '20px' }}>🎰 SYUM BET</h2>
-          <NotificationCenter />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+             <h2 style={{ margin: 0, color: '#1a237e', fontSize: '20px' }}>🎰 SYUM BET</h2>
+             <NotificationCenter />
+          </div>
           <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} style={{ background: 'none', border: 'none', fontSize: '28px', cursor: 'pointer', color: textColor }}>☰</button>
         </div>
       )}
@@ -170,11 +155,17 @@ function AppContent() {
         <div onClick={() => setIsMobileMenuOpen(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 999 }}></div>
       )}
 
+      {/* SIDEBAR - Added Notification Center here for Desktop */}
       {showNav && (
         <aside style={sidebarStyle}>
           <div style={{ padding: '20px', borderBottom: `1px solid ${navBorder}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ margin: 0, color: '#1a237e' }}>🎰 SYUM BET</h2>
-            {isMobile && <button onClick={() => setIsMobileMenuOpen(false)} style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', color: textColor }}>✕</button>}
+            
+            {/* Show bell in sidebar on desktop, but hide it on mobile sidebar since it's in top bar */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {!isMobile && <NotificationCenter />}
+              {isMobile && <button onClick={() => setIsMobileMenuOpen(false)} style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', color: textColor }}>✕</button>}
+            </div>
           </div>
 
           <nav style={{ flex: 1, padding: '20px 10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>

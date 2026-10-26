@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { db, auth } from '../firebase';
-import { collection, query, where, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { ThemeContext } from '../ThemeContext';
 
 export default function NotificationCenter() {
@@ -12,54 +12,34 @@ export default function NotificationCenter() {
   useEffect(() => {
     if (!auth.currentUser) return;
 
-    // Listen for personal notifications (transfers)
-    const qUser = query(
+    const q = query(
       collection(db, "notifications"), 
-      where("userId", "==", auth.currentUser.uid),
-      orderBy("createdAt", "desc")
+      where("userId", "==", auth.currentUser.uid)
     );
 
-    const unsubscribeUser = onSnapshot(qUser, (snapshot) => {
+    const unsubscribe = onSnapshot(q, (snapshot) => {
       const notifs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      // Only set notifications if we have personal ones, otherwise keep global
-      setNotifications(prev => {
-        const combined = [...prev.filter(n => n.type === 'global'), ...notifs];
-        return combined.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      });
-      // Count unread personal notifications
-      setUnreadCount(notifs.filter(n => !n.read).length);
-    });
-
-    // Listen for global announcements
-    const qGlobal = query(collection(db, "announcements"), orderBy("createdAt", "desc"));
-    const unsubscribeGlobal = onSnapshot(qGlobal, (snapshot) => {
-      const globalNotifs = snapshot.docs.map(d => ({ 
-        id: d.id, 
-        type: 'global', 
-        message: d.data().message, 
-        createdAt: d.data().createdAt, 
-        read: true // Global announcements don't trigger the red dot
-      }));
+      notifs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       
-      setNotifications(prev => {
-        const combined = [...prev.filter(n => n.type !== 'global'), ...globalNotifs];
-        return combined.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      });
+      // Limit display to latest 15 to prevent lag
+      setNotifications(notifs.slice(0, 15));
+      
+      const unread = notifs.filter(n => n.read === false).length;
+      setUnreadCount(unread);
     });
 
-    return () => { unsubscribeUser(); unsubscribeGlobal(); };
+    return () => unsubscribe();
   }, []);
 
   const toggleOpen = async () => {
-    setIsOpen(!isOpen);
+    const newOpenState = !isOpen;
+    setIsOpen(newOpenState);
     
-    // If opening, mark all personal notifications as read
-    if (!isOpen) {
-      const unreadIds = notifications.filter(n => !n.read && n.type !== 'global').map(n => n.id);
-      for (const id of unreadIds) {
-        await updateDoc(doc(db, "notifications", id), { read: true });
+    if (newOpenState && unreadCount > 0) {
+      const unreadNotifs = notifications.filter(n => n.read === false);
+      for (const notif of unreadNotifs) {
+        await updateDoc(doc(db, "notifications", notif.id), { read: true });
       }
-      setUnreadCount(0);
     }
   };
 
@@ -69,56 +49,32 @@ export default function NotificationCenter() {
 
   return (
     <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-      {/* Bell Icon with fixed size */}
       <button 
         onClick={toggleOpen} 
-        style={{ 
-          background: 'none', 
-          border: 'none', 
-          cursor: 'pointer', 
-          position: 'relative', 
-          padding: '8px', 
-          fontSize: '24px', // Fixed font size
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center' 
-        }}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', position: 'relative', padding: '8px', fontSize: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       >
         🔔
         {unreadCount > 0 && (
-          <span style={{ 
-            position: 'absolute', 
-            top: '2px', 
-            right: '2px', 
-            backgroundColor: '#d32f2f', 
-            color: 'white', 
-            fontSize: '10px', 
-            fontWeight: 'bold', 
-            padding: '2px 5px', 
-            borderRadius: '50%',
-            minWidth: '16px',
-            textAlign: 'center'
-          }}>
-            {unreadCount}
+          <span style={{ position: 'absolute', top: '-2px', right: '-5px', backgroundColor: '#ff0000', color: 'white', fontSize: '12px', fontWeight: 'bold', padding: '1px 5px', borderRadius: '50%', boxShadow: '0 2px 5px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '18px', height: '18px' }}>
+            {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
       </button>
 
-      {/* Dropdown */}
       {isOpen && (
-        <div style={{ position: 'absolute', top: '40px', right: '0', width: '300px', backgroundColor: bg, border: `1px solid ${border}`, borderRadius: '8px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)', zIndex: 2000, maxHeight: '400px', overflowY: 'auto' }}>
-          <div style={{ padding: '15px', borderBottom: `1px solid ${border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ position: 'absolute', top: '45px', right: '0', width: '320px', backgroundColor: bg, border: `1px solid ${border}`, borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', zIndex: 2000, maxHeight: '400px', overflowY: 'auto' }}>
+          <div style={{ padding: '15px', borderBottom: `1px solid ${border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: darkMode ? '#252525' : '#f8f9fa', borderTopLeftRadius: '12px', borderTopRightRadius: '12px' }}>
             <h4 style={{ margin: 0, color: text }}>Notifications</h4>
             <button onClick={() => setIsOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', fontSize: '16px' }}>✕</button>
           </div>
           
           {notifications.length === 0 ? (
-            <p style={{ padding: '20px', textAlign: 'center', color: '#666', fontSize: '12px' }}>No new notifications</p>
+            <p style={{ padding: '30px', textAlign: 'center', color: '#666', fontSize: '13px' }}>No notifications yet.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {notifications.map((notif) => (
-                <div key={notif.id} style={{ padding: '15px', borderBottom: `1px solid ${border}`, backgroundColor: notif.read ? 'transparent' : (darkMode ? '#2a2a2a' : '#f5f7ff') }}>
-                  <p style={{ margin: '0 0 5px 0', fontSize: '13px', color: text }}>{notif.message}</p>
+                <div key={notif.id} style={{ padding: '15px', borderBottom: `1px solid ${border}`, backgroundColor: notif.read ? 'transparent' : (darkMode ? '#2a2a4a' : '#e8eaf6') }}>
+                  <p style={{ margin: '0 0 5px 0', fontSize: '13px', color: text, fontWeight: notif.read ? 'normal' : 'bold' }}>{notif.message}</p>
                   <span style={{ fontSize: '10px', color: '#888' }}>{new Date(notif.createdAt).toLocaleString()}</span>
                 </div>
               ))}

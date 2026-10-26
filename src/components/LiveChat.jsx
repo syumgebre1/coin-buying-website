@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../firebase';
-import { collection, addDoc, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, query, orderBy, limit, onSnapshot, getDocs } from 'firebase/firestore';
 import { ThemeContext } from '../ThemeContext';
 import toast from 'react-hot-toast';
 
@@ -22,7 +22,6 @@ export default function LiveChat() {
   }, []);
 
   useEffect(() => {
-    // Auto-scroll to bottom when new messages arrive
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
@@ -31,12 +30,34 @@ export default function LiveChat() {
     if (!newMessage.trim()) return;
 
     try {
+      // 1. Send the chat message
       await addDoc(collection(db, "global_chat"), {
         text: newMessage,
         userId: auth.currentUser.uid,
         userEmail: auth.currentUser.email,
         createdAt: new Date().toISOString()
       });
+
+      // 2. Send a notification to everyone EXCEPT the sender
+      const usersSnapshot = await getDocs(collection(db, "users"));
+      const notificationPromises = [];
+      
+      usersSnapshot.forEach((userDoc) => {
+        if (userDoc.id !== auth.currentUser.uid) {
+          notificationPromises.push(
+            addDoc(collection(db, "notifications"), {
+              userId: userDoc.id,
+              message: `💬 New message in Lobby from ${auth.currentUser.email.split('@')[0]}: "${newMessage}"`,
+              type: 'lobby',
+              read: false,
+              createdAt: new Date().toISOString()
+            })
+          );
+        }
+      });
+      
+      await Promise.all(notificationPromises);
+
       setNewMessage('');
     } catch (error) {
       toast.error("Failed to send message.");
