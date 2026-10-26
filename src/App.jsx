@@ -18,6 +18,8 @@ import AdminDashboard from './components/AdminDashboard';
 import CasinoHub from './components/CasinoHub';
 import UserProfile from './components/UserProfile';
 import Leaderboard from './components/Leaderboard';
+import Missions from "./components/Missions";
+import Lottery from "./components/Lottery";
 import Withdraw from './components/Withdraw';
 import VerifyEmail from './components/VerifyEmail';
 import ForcePasswordChange from './components/ForcePasswordChange';
@@ -94,6 +96,8 @@ function AppContent() {
           <Route path="/history" element={<ProtectedRoute user={user}><TransactionHistory /></ProtectedRoute>} />
           <Route path="/invite" element={<ProtectedRoute user={user}><InviteRewards /></ProtectedRoute>} />
           <Route path="/casino" element={<ProtectedRoute user={user}><CasinoHub /></ProtectedRoute>} />
+<Route path="/missions" element={<ProtectedRoute user={user}><Missions /></ProtectedRoute>} />
+<Route path="/lottery" element={<ProtectedRoute user={user}><Lottery /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute user={user}><UserProfile /></ProtectedRoute>} />
           <Route path="/leaderboard" element={<ProtectedRoute user={user}><Leaderboard /></ProtectedRoute>} />
           <Route path="/withdraw" element={<ProtectedRoute user={user}><Withdraw /></ProtectedRoute>} />
@@ -104,7 +108,9 @@ function AppContent() {
       {user && user.emailVerified && window.location.pathname !== '/' && (
         <nav style={{ position: 'fixed', bottom: '40px', left: 0, right: 0, backgroundColor: navBg, borderTop: `1px solid ${navBorder}`, display: 'flex', justifyContent: 'space-around', padding: '15px 5px', boxShadow: '0 -2px 10px rgba(0,0,0,0.05)', overflowX: 'auto', zIndex: 100 }}>
           <Link to="/dashboard" style={{ textDecoration: 'none', color: textColor, fontWeight: 'bold', fontSize: '12px' }}>Home</Link>
-          <Link to="/casino" style={{ textDecoration: 'none', color: textColor, fontWeight: 'bold', fontSize: '12px' }}>Casino</Link>
+          <Link to="/casino" style={{ textDecoration: "none", color: textColor, fontWeight: "bold", fontSize: "12px" }}>Casino</Link>
+<Link to="/missions" style={{ textDecoration: "none", color: textColor, fontWeight: "bold", fontSize: "12px" }}>Missions</Link>
+<Link to="/lottery" style={{ textDecoration: "none", color: textColor, fontWeight: "bold", fontSize: "12px" }}>Lottery</Link>
           <Link to="/leaderboard" style={{ textDecoration: 'none', color: textColor, fontWeight: 'bold', fontSize: '12px' }}>Leaders</Link>
           <Link to="/history" style={{ textDecoration: 'none', color: textColor, fontWeight: 'bold', fontSize: '12px' }}>History</Link>
           <Link to="/profile" style={{ textDecoration: 'none', color: textColor, fontWeight: 'bold', fontSize: '12px' }}>Profile</Link>
