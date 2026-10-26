@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, onSnapshot, collection, query, orderBy, limit } from 'firebase/firestore';
@@ -44,6 +44,7 @@ function AppContent() {
   const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
   const [lastAnnouncement, setLastAnnouncement] = useState('');
   const { darkMode, setDarkMode } = useContext(ThemeContext);
+  const location = useLocation(); // Get current URL path
 
   useEffect(() => {
     let unsubDoc = null;
@@ -54,11 +55,7 @@ function AppContent() {
           if (docSnap.exists()) {
             const data = docSnap.data();
             setIsAdmin(data.role === 'admin');
-            if (data.hasChangedPassword === false) {
-              setNeedsPasswordChange(true);
-            } else {
-              setNeedsPasswordChange(false);
-            }
+            setNeedsPasswordChange(data.hasChangedPassword === false);
           }
         });
       } else {
@@ -70,14 +67,12 @@ function AppContent() {
     return () => { unsubscribeAuth(); if (unsubDoc) unsubDoc(); };
   }, []);
 
-  // Listen for Admin Announcements
   useEffect(() => {
     if (!user) return;
     const q = query(collection(db, "announcements"), orderBy("createdAt", "desc"), limit(1));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       if (!snapshot.empty) {
         const latest = snapshot.docs[0].data();
-        // Only show if it's a new message we haven't seen yet
         if (latest.message !== lastAnnouncement) {
           toast.success(latest.message, { duration: 6000, icon: '📢' });
           setLastAnnouncement(latest.message);
@@ -92,54 +87,77 @@ function AppContent() {
   const navBg = darkMode ? '#1e1e1e' : 'white';
   const navBorder = darkMode ? '#333' : '#eee';
   const textColor = darkMode ? '#fff' : '#1a237e';
-
-  if (user && !user.emailVerified && window.location.pathname !== '/') {
-    return <VerifyEmail user={user} refreshUser={(u) => setUser({ ...u })} />;
-  }
+  
+  // Determine if we should show the sidebar
+  const showSidebar = user && user.emailVerified && location.pathname !== '/';
 
   return (
-    <div className="app-container" style={{ textAlign: 'center', padding: '20px', paddingBottom: '100px', color: darkMode ? '#fff' : '#000' }}>
-      {needsPasswordChange && <ForcePasswordChange onClose={() => setNeedsPasswordChange(false)} />}
+    <div className="app-container" style={{ display: 'flex', minHeight: '100vh', color: darkMode ? '#fff' : '#000' }}>
+      
+      {/* SIDEBAR NAVIGATION */}
+      {showSidebar && (
+        <aside style={{ width: '250px', backgroundColor: navBg, borderRight: `1px solid ${navBorder}`, display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, bottom: 0, left: 0, zIndex: 100, overflowY: 'auto' }}>
+          
+          <div style={{ padding: '20px', borderBottom: `1px solid ${navBorder}`, textAlign: 'center' }}>
+            <h2 style={{ margin: 0, color: '#1a237e' }}>🪙 Coin App</h2>
+          </div>
 
-      <main className="content">
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={!user ? <LoginPage /> : <Navigate to="/dashboard" />} />
-          <Route path="/dashboard" element={<ProtectedRoute user={user}><GetCoinsPage /></ProtectedRoute>} />
-          <Route path="/custom" element={<ProtectedRoute user={user}><CustomAmountPage /></ProtectedRoute>} />
-          <Route path="/payment" element={<ProtectedRoute user={user}><CardPaymentForm /></ProtectedRoute>} />
-          <Route path="/success" element={<ProtectedRoute user={user}><OrderConfirmation /></ProtectedRoute>} />
-          <Route path="/history" element={<ProtectedRoute user={user}><TransactionHistory /></ProtectedRoute>} />
-          <Route path="/invite" element={<ProtectedRoute user={user}><InviteRewards /></ProtectedRoute>} />
-          <Route path="/casino" element={<ProtectedRoute user={user}><CasinoHub /></ProtectedRoute>} />
-          <Route path="/profile" element={<ProtectedRoute user={user}><UserProfile /></ProtectedRoute>} />
-          <Route path="/leaderboard" element={<ProtectedRoute user={user}><Leaderboard /></ProtectedRoute>} />
-          <Route path="/withdraw" element={<ProtectedRoute user={user}><Withdraw /></ProtectedRoute>} />
-          <Route path="/missions" element={<ProtectedRoute user={user}><Missions /></ProtectedRoute>} />
-          <Route path="/lottery" element={<ProtectedRoute user={user}><Lottery /></ProtectedRoute>} />
-          <Route path="/admin" element={<AdminRoute user={user} isAdmin={isAdmin}><AdminDashboard /></AdminRoute>} />
-        </Routes>
-      </main>
+          <nav style={{ flex: 1, padding: '20px 10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <Link to="/dashboard" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: location.pathname === '/dashboard' ? 'white' : textColor, backgroundColor: location.pathname === '/dashboard' ? '#1a237e' : 'transparent', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>🏠 Home</Link>
+            <Link to="/casino" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: location.pathname === '/casino' ? 'white' : textColor, backgroundColor: location.pathname === '/casino' ? '#1a237e' : 'transparent', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>🎰 Casino</Link>
+            <Link to="/missions" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: location.pathname === '/missions' ? 'white' : textColor, backgroundColor: location.pathname === '/missions' ? '#1a237e' : 'transparent', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>🎯 Missions</Link>
+            <Link to="/lottery" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: location.pathname === '/lottery' ? 'white' : textColor, backgroundColor: location.pathname === '/lottery' ? '#1a237e' : 'transparent', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>🎟️ Lottery</Link>
+            <Link to="/leaderboard" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: location.pathname === '/leaderboard' ? 'white' : textColor, backgroundColor: location.pathname === '/leaderboard' ? '#1a237e' : 'transparent', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>🏆 Leaders</Link>
+            <Link to="/history" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: location.pathname === '/history' ? 'white' : textColor, backgroundColor: location.pathname === '/history' ? '#1a237e' : 'transparent', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>📜 History</Link>
+            <Link to="/profile" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: location.pathname === '/profile' ? 'white' : textColor, backgroundColor: location.pathname === '/profile' ? '#1a237e' : 'transparent', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>👤 Profile</Link>
+            
+            {isAdmin && (
+              <Link to="/admin" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: location.pathname === '/admin' ? 'white' : '#d32f2f', backgroundColor: location.pathname === '/admin' ? '#d32f2f' : 'transparent', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px', borderTop: `1px solid ${navBorder}`, paddingTop: '20px' }}>🛡️ Admin</Link>
+            )}
+          </nav>
 
-      {user && user.emailVerified && window.location.pathname !== '/' && (
-        <nav style={{ position: 'fixed', bottom: '40px', left: 0, right: 0, backgroundColor: navBg, borderTop: `1px solid ${navBorder}`, display: 'flex', justifyContent: 'space-around', padding: '15px 5px', boxShadow: '0 -2px 10px rgba(0,0,0,0.05)', overflowX: 'auto', zIndex: 100 }}>
-          <Link to="/dashboard" style={{ textDecoration: 'none', color: textColor, fontWeight: 'bold', fontSize: '12px' }}>Home</Link>
-          <Link to="/casino" style={{ textDecoration: 'none', color: textColor, fontWeight: 'bold', fontSize: '12px' }}>Casino</Link>
-          <Link to="/missions" style={{ textDecoration: 'none', color: textColor, fontWeight: 'bold', fontSize: '12px' }}>Missions</Link>
-          <Link to="/lottery" style={{ textDecoration: 'none', color: textColor, fontWeight: 'bold', fontSize: '12px' }}>Lottery</Link>
-          <Link to="/history" style={{ textDecoration: 'none', color: textColor, fontWeight: 'bold', fontSize: '12px' }}>History</Link>
-          <Link to="/profile" style={{ textDecoration: 'none', color: textColor, fontWeight: 'bold', fontSize: '12px' }}>Profile</Link>
-          {isAdmin && <Link to="/admin" style={{ textDecoration: 'none', color: '#d32f2f', fontWeight: 'bold', fontSize: '12px' }}>Admin</Link>}
-          <button onClick={() => setDarkMode(!darkMode)} style={{ background: 'none', border: 'none', color: textColor, fontWeight: 'bold', fontSize: '12px', cursor: 'pointer' }}>
-            {darkMode ? 'Light' : 'Dark'}
-          </button>
-          <button onClick={() => signOut(auth)} style={{ background: 'none', border: 'none', color: '#666', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer' }}>Out</button>
-        </nav>
+          <div style={{ padding: '20px', borderTop: `1px solid ${navBorder}` }}>
+            <button onClick={() => setDarkMode(!darkMode)} style={{ width: '100%', padding: '10px', marginBottom: '10px', backgroundColor: 'transparent', color: textColor, border: `1px solid ${navBorder}`, borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+              {darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
+            </button>
+            <button onClick={() => signOut(auth)} style={{ width: '100%', padding: '10px', backgroundColor: '#d32f2f', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+              Logout
+            </button>
+          </div>
+        </aside>
       )}
 
-      <footer style={{ position: 'fixed', bottom: 0, left: 0, right: 0, backgroundColor: darkMode ? '#121212' : '#f1f1f1', borderTop: `1px solid ${navBorder}`, padding: '10px', textAlign: 'center', fontSize: '12px', zIndex: 101, color: darkMode ? '#aaa' : '#555' }}>
-        Built with ❤️ by <a href="https://syum-portfolio.netlify.app" target="_blank" rel="noreferrer" style={{ color: '#1a237e', fontWeight: 'bold', textDecoration: 'none' }}>SYUM TEAME</a>
-      </footer>
+      {/* MAIN CONTENT AREA */}
+      <div style={{ flex: 1, marginLeft: showSidebar ? '250px' : '0', display: 'flex', flexDirection: 'column', minHeight: '100vh', paddingBottom: '40px' }}>
+        
+        {needsPasswordChange && <ForcePasswordChange onClose={() => setNeedsPasswordChange(false)} />}
+
+        <main style={{ flex: 1, padding: '20px' }}>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={!user ? <LoginPage /> : <Navigate to="/dashboard" />} />
+            <Route path="/dashboard" element={<ProtectedRoute user={user}><GetCoinsPage /></ProtectedRoute>} />
+            <Route path="/custom" element={<ProtectedRoute user={user}><CustomAmountPage /></ProtectedRoute>} />
+            <Route path="/payment" element={<ProtectedRoute user={user}><CardPaymentForm /></ProtectedRoute>} />
+            <Route path="/success" element={<ProtectedRoute user={user}><OrderConfirmation /></ProtectedRoute>} />
+            <Route path="/history" element={<ProtectedRoute user={user}><TransactionHistory /></ProtectedRoute>} />
+            <Route path="/invite" element={<ProtectedRoute user={user}><InviteRewards /></ProtectedRoute>} />
+            <Route path="/casino" element={<ProtectedRoute user={user}><CasinoHub /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute user={user}><UserProfile /></ProtectedRoute>} />
+            <Route path="/leaderboard" element={<ProtectedRoute user={user}><Leaderboard /></ProtectedRoute>} />
+            <Route path="/withdraw" element={<ProtectedRoute user={user}><Withdraw /></ProtectedRoute>} />
+            <Route path="/missions" element={<ProtectedRoute user={user}><Missions /></ProtectedRoute>} />
+            <Route path="/lottery" element={<ProtectedRoute user={user}><Lottery /></ProtectedRoute>} />
+            <Route path="/admin" element={<AdminRoute user={user} isAdmin={isAdmin}><AdminDashboard /></AdminRoute>} />
+            <Route path="/verify" element={<VerifyEmail user={user} refreshUser={(u) => setUser({ ...u })} />} />
+          </Routes>
+        </main>
+
+        <footer style={{ backgroundColor: darkMode ? '#121212' : '#f1f1f1', borderTop: `1px solid ${navBorder}`, padding: '10px', textAlign: 'center', fontSize: '12px', color: darkMode ? '#aaa' : '#555' }}>
+          Built with ❤️ by <a href="https://syum-portfolio.netlify.app" target="_blank" rel="noreferrer" style={{ color: '#1a237e', fontWeight: 'bold', textDecoration: 'none' }}>SYUM TEAME</a>
+        </footer>
+      </div>
+
     </div>
   );
 }

@@ -8,6 +8,8 @@ export default function VerifyEmail({ user, refreshUser }) {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  if (!user) return null;
+
   const resendEmail = async () => {
     setLoading(true);
     try {
@@ -25,7 +27,7 @@ export default function VerifyEmail({ user, refreshUser }) {
       await auth.currentUser.reload();
       if (auth.currentUser.emailVerified) {
         toast.success("Email verified successfully!");
-        refreshUser(auth.currentUser); // Update state to unlock the app
+        refreshUser(auth.currentUser);
       } else {
         toast.error("Email not verified yet. Please check your inbox.");
       }
@@ -36,25 +38,27 @@ export default function VerifyEmail({ user, refreshUser }) {
   };
 
   return (
-    <div style={{ maxWidth: '400px', margin: '80px auto', padding: '30px', textAlign: 'center', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', color: '#000' }}>
-      <div style={{ fontSize: '60px', marginBottom: '20px' }}>✉️</div>
-      <h2 style={{ margin: '0 0 10px 0' }}>Verify Your Email</h2>
-      <p style={{ color: '#666', marginBottom: '20px' }}>
-        We sent a verification link to <strong>{user.email}</strong>. Please click the link in your email to activate your account.
-      </p>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+      <div style={{ maxWidth: '400px', width: '90%', padding: '30px', textAlign: 'center', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)', color: '#000' }}>
+        <div style={{ fontSize: '60px', marginBottom: '20px' }}>✉️</div>
+        <h2 style={{ margin: '0 0 10px 0' }}>Verify Your Email</h2>
+        <p style={{ color: '#666', marginBottom: '20px' }}>
+          We sent a verification link to <strong>{user.email}</strong>. Please click the link to activate your account.
+        </p>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <button onClick={checkVerification} disabled={loading} style={{ padding: '15px', backgroundColor: '#1a237e', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
-          {loading ? 'Checking...' : "I've Verified My Email"}
-        </button>
-        
-        <button onClick={resendEmail} disabled={loading} style={{ padding: '15px', backgroundColor: 'transparent', color: '#1a237e', border: '1px solid #1a237e', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>
-          Resend Verification Email
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <button onClick={checkVerification} disabled={loading} style={{ padding: '15px', backgroundColor: '#1a237e', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
+            {loading ? 'Checking...' : "I've Verified My Email"}
+          </button>
+          
+          <button onClick={resendEmail} disabled={loading} style={{ padding: '15px', backgroundColor: 'transparent', color: '#1a237e', border: '1px solid #1a237e', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>
+            Resend Verification Email
+          </button>
 
-        <button onClick={() => signOut(auth).then(() => navigate('/login'))} style={{ marginTop: '20px', padding: '10px', backgroundColor: 'transparent', color: '#d32f2f', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>
-          Logout
-        </button>
+          <button onClick={() => signOut(auth).then(() => navigate('/login'))} style={{ marginTop: '10px', padding: '10px', backgroundColor: 'transparent', color: '#d32f2f', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>
+            Logout
+          </button>
+        </div>
       </div>
     </div>
   );
