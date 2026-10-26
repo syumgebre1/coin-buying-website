@@ -4,6 +4,8 @@ import { db, auth } from '../firebase';
 import { doc, onSnapshot, getDoc, updateDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { ThemeContext } from '../ThemeContext';
+import MarketTicker from './MarketTicker';
+import { fireConfetti } from '../utils/confetti';
 
 export default function GetCoinsPage() {
   const navigate = useNavigate();
@@ -41,14 +43,12 @@ export default function GetCoinsPage() {
       return toast.error("You already claimed your daily bonus today!");
     }
 
-    // Calculate new streak
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const wasYesterday = lastCheckIn === yesterday.toDateString();
     
     const newStreak = wasYesterday ? streak + 1 : 1;
     
-    // Calculate reward based on streak
     let reward = 20;
     if (newStreak >= 7) reward = 150;
     else if (newStreak >= 5) reward = 100;
@@ -65,6 +65,7 @@ export default function GetCoinsPage() {
         streak: newStreak
       });
       toast.success(`Day ${newStreak} Streak! Claimed +${reward} Coins 🎁`);
+      fireConfetti(); // 🎉 Confetti effect
     } catch (error) {
       toast.error("Error claiming bonus.");
     }
@@ -94,6 +95,7 @@ export default function GetCoinsPage() {
       await updateDoc(promoRef, { used: true });
       
       toast.success(`Redeemed ${promoData.coins} coins!`);
+      fireConfetti();
       setPromoCode('');
     } catch (error) {
       toast.error("Error redeeming code.");
@@ -108,6 +110,8 @@ export default function GetCoinsPage() {
 
   return (
     <div style={{ maxWidth: '400px', margin: '0 auto' }}>
+      <MarketTicker />
+      
       <div style={{ backgroundColor: '#1a237e', color: 'white', padding: '20px', borderRadius: '12px', marginBottom: '20px', textAlign: 'center', boxShadow: '0 4px 10px rgba(26,35,126,0.3)' }}>
         <p style={{ margin: 0, fontSize: '14px', opacity: 0.8 }}>My Balance</p>
         <h1 style={{ margin: '5px 0 0 0', fontSize: '36px' }}>🪙 {userCoins} <span style={{ fontSize: '16px' }}>Coins</span></h1>

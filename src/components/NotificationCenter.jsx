@@ -61,16 +61,16 @@ export default function NotificationCenter() {
 
       {isOpen && (
         <div style={{ 
-          position: 'absolute', 
-          top: '50px', 
-          left: '0', // Align to the left so it doesn't go off-screen
-          width: '320px', 
+          position: 'fixed', // Using fixed to bypass sidebar constraints
+          top: '70px', // Position it just below the header
+          left: '10px', // Align to the left edge
+          width: '300px', 
           backgroundColor: bg, 
           border: `1px solid ${border}`, 
           borderRadius: '12px', 
           boxShadow: '0 10px 25px rgba(0,0,0,0.3)', 
-          zIndex: 3000, 
-          maxHeight: '400px', 
+          zIndex: 9999, 
+          maxHeight: '80vh', 
           overflowY: 'auto' 
         }}>
           <div style={{ padding: '15px', borderBottom: `1px solid ${border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: darkMode ? '#252525' : '#f8f9fa', borderTopLeftRadius: '12px', borderTopRightRadius: '12px' }}>
@@ -93,7 +93,7 @@ export default function NotificationCenter() {
                     fontSize: '13px', 
                     color: text, 
                     fontWeight: notif.read ? 'normal' : 'bold',
-                    wordWrap: 'break-word', // This stops the text from being cut off
+                    wordWrap: 'break-word', 
                     whiteSpace: 'normal',
                     lineHeight: '1.4'
                   }}>
