@@ -25,7 +25,8 @@ import ForcePasswordChange from './components/ForcePasswordChange';
 import Missions from './components/Missions';
 import Lottery from './components/Lottery';
 import Friends from './components/Friends';
-import LiveChat from './components/LiveChat'; // Import LiveChat
+import NotificationCenter from "./components/NotificationCenter";
+import LiveChat from './components/LiveChat';
 import './App.css';
 
 function ProtectedRoute({ user, children }) {
@@ -43,8 +44,9 @@ function AppContent() {
   const [user, setUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [timeoutReached, setTimeoutReached] = useState(false);
   const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
-  const [isMaintenance, setIsMaintenance] = useState(false); // New Maintenance State
+  const [isMaintenance, setIsMaintenance] = useState(false);
   const [lastAnnouncement, setLastAnnouncement] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
@@ -61,6 +63,14 @@ function AppContent() {
   const isMobile = windowWidth <= 768;
   useEffect(() => { setIsMobileMenuOpen(false); }, [location.pathname]);
 
+  // Timeout logic
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (loading) setTimeoutReached(true);
+    }, 5000); // 5 seconds
+    return () => clearTimeout(timer);
+  }, [loading]);
+
   useEffect(() => {
     let unsubDoc = null;
     let unsubSettings = null;
@@ -74,6 +84,9 @@ function AppContent() {
             setIsAdmin(data.role === 'admin');
             setNeedsPasswordChange(data.hasChangedPassword === false);
           }
+        }, (error) => {
+          console.error("Error fetching user data:", error);
+          setLoading(false); // Force stop loading if error
         });
       } else {
         setIsAdmin(false);
@@ -82,7 +95,6 @@ function AppContent() {
       setLoading(false);
     });
 
-    // Listen for Maintenance Mode changes
     unsubSettings = onSnapshot(doc(db, "settings", "config"), (docSnap) => {
       if (docSnap.exists()) {
         setIsMaintenance(docSnap.data().maintenance || false);
@@ -107,9 +119,21 @@ function AppContent() {
     return () => unsubscribe();
   }, [user, lastAnnouncement]);
 
-  if (loading) return <div style={{ textAlign: 'center', marginTop: '50px' }}>Loading...</div>;
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: darkMode ? '#121212' : '#f5f5f5', color: darkMode ? 'white' : 'black' }}>
+        <h2>Loading Coin App...</h2>
+        <div style={{ width: '40px', height: '40px', border: '4px solid #ccc', borderTop: '4px solid #1a237e', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '20px 0' }}></div>
+        {timeoutReached && (
+          <div style={{ textAlign: 'center' }}>
+            <p>Taking longer than usual. Check your connection.</p>
+            <button onClick={() => window.location.reload()} style={{ padding: '10px 20px', backgroundColor: '#1a237e', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Reload Page</button>
+          </div>
+        )}
+      </div>
+    );
+  }
 
-  // MAINTENANCE MODE BLOCK
   if (isMaintenance && !isAdmin && location.pathname !== '/') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', textAlign: 'center', backgroundColor: darkMode ? '#121212' : '#f5f5f5', color: darkMode ? 'white' : 'black' }}>
@@ -137,6 +161,7 @@ function AppContent() {
       {showNav && isMobile && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: '60px', backgroundColor: navBg, borderBottom: `1px solid ${navBorder}`, zIndex: 900, display: 'flex', alignItems: 'center', padding: '0 20px', justifyContent: 'space-between' }}>
           <h2 style={{ margin: 0, color: '#1a237e', fontSize: '20px' }}>🪙 Coin App</h2>
+          <NotificationCenter />
           <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} style={{ background: 'none', border: 'none', fontSize: '28px', cursor: 'pointer', color: textColor }}>☰</button>
         </div>
       )}
@@ -155,7 +180,7 @@ function AppContent() {
           <nav style={{ flex: 1, padding: '20px 10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <Link to="/dashboard" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: location.pathname === '/dashboard' ? 'white' : textColor, backgroundColor: location.pathname === '/dashboard' ? '#1a237e' : 'transparent', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>🏠 Home</Link>
             <Link to="/casino" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: location.pathname === '/casino' ? 'white' : textColor, backgroundColor: location.pathname === '/casino' ? '#1a237e' : 'transparent', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>🎰 Casino</Link>
-            <Link to="/livechat" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: location.pathname === '/livechat' ? 'white' : textColor, backgroundColor: location.pathname === '/livechat' ? '#1a237e' : 'transparent', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>💬 Lobby</Link> {/* New Link */}
+            <Link to="/livechat" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: location.pathname === '/livechat' ? 'white' : textColor, backgroundColor: location.pathname === '/livechat' ? '#1a237e' : 'transparent', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>💬 Lobby</Link>
             <Link to="/friends" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: location.pathname === '/friends' ? 'white' : textColor, backgroundColor: location.pathname === '/friends' ? '#1a237e' : 'transparent', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>👥 Friends</Link>
             <Link to="/missions" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: location.pathname === '/missions' ? 'white' : textColor, backgroundColor: location.pathname === '/missions' ? '#1a237e' : 'transparent', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>🎯 Missions</Link>
             <Link to="/lottery" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: location.pathname === '/lottery' ? 'white' : textColor, backgroundColor: location.pathname === '/lottery' ? '#1a237e' : 'transparent', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>🎟️ Lottery</Link>
@@ -190,7 +215,7 @@ function AppContent() {
             <Route path="/history" element={<ProtectedRoute user={user}><TransactionHistory /></ProtectedRoute>} />
             <Route path="/invite" element={<ProtectedRoute user={user}><InviteRewards /></ProtectedRoute>} />
             <Route path="/casino" element={<ProtectedRoute user={user}><CasinoHub /></ProtectedRoute>} />
-            <Route path="/livechat" element={<ProtectedRoute user={user}><LiveChat /></ProtectedRoute>} /> {/* New Route */}
+            <Route path="/livechat" element={<ProtectedRoute user={user}><LiveChat /></ProtectedRoute>} />
             <Route path="/friends" element={<ProtectedRoute user={user}><Friends /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute user={user}><UserProfile /></ProtectedRoute>} />
             <Route path="/leaderboard" element={<ProtectedRoute user={user}><Leaderboard /></ProtectedRoute>} />

@@ -73,6 +73,7 @@ export default function AdminDashboard() {
     const msg = prompt("Enter announcement message for all users:");
     if (msg) {
       await addDoc(collection(db, "announcements"), { message: msg, createdAt: new Date().toISOString() });
+      toast.success("Announcement sent!");
       toast.success("Announcement sent to all users!");
     }
   };

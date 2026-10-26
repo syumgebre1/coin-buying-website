@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../firebase';
-import { doc, getDoc, updateDoc, collection, query, where, getDocs, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, runTransaction, addDoc } from 'firebase/firestore';
 import { ThemeContext } from '../ThemeContext';
 import toast from 'react-hot-toast';
 
@@ -22,26 +22,18 @@ export default function Friends() {
       setProfile(data);
       
       if (data.friends && data.friends.length > 0) {
-        // Fetch friends details. We fetch them individually to avoid 'in' query limits.
-        const friendPromises = data.friends.map(email => 
-          getDocs(query(collection(db, "users"), where("email", "==", email)))
-        );
+        const friendPromises = data.friends.map(email => getDocs(query(collection(db, "users"), where("email", "==", email))));
         const friendSnaps = await Promise.all(friendPromises);
-        
         const friendsList = [];
         friendSnaps.forEach(snap => {
-          if (!snap.empty) {
-            friendsList.push({ id: snap.docs[0].id, ...snap.docs[0].data() });
-          }
+          if (!snap.empty) friendsList.push({ id: snap.docs[0].id, ...snap.docs[0].data() });
         });
         setFriends(friendsList);
       }
     }
   };
 
-  useEffect(() => {
-    fetchFriendsData();
-  }, []);
+  useEffect(() => { fetchFriendsData(); }, []);
 
   const addFriend = async () => {
     if (!searchEmail) return;
@@ -51,7 +43,6 @@ export default function Friends() {
     try {
       const q = query(collection(db, "users"), where("email", "==", searchEmail));
       const snap = await getDocs(q);
-      
       if (snap.empty) return toast.error("User not found!");
 
       const newFriendsList = [...(profile.friends || []), searchEmail];
@@ -60,11 +51,8 @@ export default function Friends() {
       setProfile({ ...profile, friends: newFriendsList });
       setSearchEmail('');
       toast.success("Friend added successfully!");
-      fetchFriendsData(); // Refresh the list
-    } catch (e) {
-      console.error(e);
-      toast.error("Error adding friend.");
-    }
+      fetchFriendsData();
+    } catch (e) { toast.error("Error adding friend."); }
   };
 
   const sendCoins = async () => {
@@ -76,36 +64,35 @@ export default function Friends() {
       const senderRef = doc(db, "users", auth.currentUser.uid);
       const receiverRef = doc(db, "users", selectedFriend.id);
 
-      // Use a transaction to ensure both updates succeed or fail together
       await runTransaction(db, async (transaction) => {
         const senderDoc = await transaction.get(senderRef);
         const receiverDoc = await transaction.get(receiverRef);
-
-        if (!senderDoc.exists() || !receiverDoc.exists()) {
-          throw "User document does not exist!";
-        }
-
+        if (!senderDoc.exists() || !receiverDoc.exists()) throw "User does not exist!";
+        
         const senderBalance = senderDoc.data().coins || 0;
         const receiverBalance = receiverDoc.data().coins || 0;
-
-        if (senderBalance < amount) {
-          throw "Insufficient funds!";
-        }
+        if (senderBalance < amount) throw "Insufficient funds!";
 
         transaction.update(senderRef, { coins: senderBalance - amount });
         transaction.update(receiverRef, { coins: receiverBalance + amount });
       });
 
+      // Create a notification for the receiver
+      await addDoc(collection(db, "notifications"), {
+        userId: selectedFriend.id,
+        message: `You received ${amount} coins from ${auth.currentUser.email}`,
+        type: 'transfer',
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+
       toast.success(`Sent ${amount} coins to ${selectedFriend.email}!`);
-      
-      // Update local UI
       setProfile({ ...profile, coins: profile.coins - amount });
       setFriends(friends.map(f => f.id === selectedFriend.id ? { ...f, coins: (f.coins || 0) + amount } : f));
       setSendAmount('');
       setSelectedFriend(null);
     } catch (e) {
-      console.error("Transaction failed: ", e);
-      toast.error(typeof e === 'string' ? e : "Transfer failed. Please try again.");
+      toast.error(typeof e === 'string' ? e : "Transfer failed.");
     }
   };
 
@@ -124,7 +111,6 @@ export default function Friends() {
         <p style={{ margin: 0 }}>Your Balance: 🪙 {profile.coins} Coins</p>
       </div>
 
-      {/* Add Friend Section */}
       <div style={{ backgroundColor: cardBg, border: `1px solid ${cardBorder}`, padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
         <h3 style={{ margin: '0 0 10px 0' }}>Add a Friend</h3>
         <div style={{ display: 'flex', gap: '10px' }}>
@@ -133,7 +119,6 @@ export default function Friends() {
         </div>
       </div>
 
-      {/* Friends List & Send Coins */}
       <div style={{ backgroundColor: cardBg, border: `1px solid ${cardBorder}`, padding: '15px', borderRadius: '8px' }}>
         <h3 style={{ margin: '0 0 10px 0' }}>Your Friends ({friends.length})</h3>
         {friends.length === 0 ? <p style={{ fontSize: '12px', color: '#666' }}>No friends added yet.</p> : (
@@ -151,7 +136,6 @@ export default function Friends() {
         )}
       </div>
 
-      {/* Send Coins Modal */}
       {selectedFriend && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
           <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '12px', width: '90%', maxWidth: '350px', color: '#000' }}>
