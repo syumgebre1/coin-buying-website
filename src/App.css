@@ -3,3 +3,26 @@
   text-align: center;
   padding: 20px;
 }
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+  .mobile-top-bar {
+    display: flex !important;
+  }
+  
+  .sidebar {
+    transform: translateX(-100%);
+  }
+  
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .close-sidebar-btn {
+    display: block !important;
+  }
+
+  .main-content {
+    margin-left: 0 !important;
+    padding-top: 70px; /* Space for the mobile top bar */
+  }
+}

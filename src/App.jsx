@@ -43,8 +43,14 @@ function AppContent() {
   const [loading, setLoading] = useState(true);
   const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
   const [lastAnnouncement, setLastAnnouncement] = useState('');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // New state for mobile menu
   const { darkMode, setDarkMode } = useContext(ThemeContext);
-  const location = useLocation(); // Get current URL path
+  const location = useLocation();
+
+  // Close mobile menu when route changes
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     let unsubDoc = null;
@@ -87,19 +93,26 @@ function AppContent() {
   const navBg = darkMode ? '#1e1e1e' : 'white';
   const navBorder = darkMode ? '#333' : '#eee';
   const textColor = darkMode ? '#fff' : '#1a237e';
-  
-  // Determine if we should show the sidebar
-  const showSidebar = user && user.emailVerified && location.pathname !== '/';
+  const showNav = user && user.emailVerified && location.pathname !== '/';
 
   return (
     <div className="app-container" style={{ display: 'flex', minHeight: '100vh', color: darkMode ? '#fff' : '#000' }}>
       
-      {/* SIDEBAR NAVIGATION */}
-      {showSidebar && (
-        <aside style={{ width: '250px', backgroundColor: navBg, borderRight: `1px solid ${navBorder}`, display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, bottom: 0, left: 0, zIndex: 100, overflowY: 'auto' }}>
+      {/* MOBILE TOP BAR */}
+      {showNav && (
+        <div className="mobile-top-bar" style={{ display: 'none', position: 'fixed', top: 0, left: 0, right: 0, height: '60px', backgroundColor: navBg, borderBottom: `1px solid ${navBorder}`, zIndex: 90, alignItems: 'center', padding: '0 20px', justifyContent: 'space-between' }}>
+          <h2 style={{ margin: 0, color: '#1a237e', fontSize: '20px' }}>🪙 Coin App</h2>
+          <button onClick={() => setIsMobileMenuOpen(true)} style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', color: textColor }}>☰</button>
+        </div>
+      )}
+
+      {/* SIDEBAR (Desktop & Mobile) */}
+      {showNav && (
+        <aside className={isMobileMenuOpen ? "sidebar open" : "sidebar"} style={{ width: '250px', backgroundColor: navBg, borderRight: `1px solid ${navBorder}`, display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, bottom: 0, left: 0, zIndex: 100, overflowY: 'auto', transition: 'transform 0.3s ease' }}>
           
-          <div style={{ padding: '20px', borderBottom: `1px solid ${navBorder}`, textAlign: 'center' }}>
+          <div style={{ padding: '20px', borderBottom: `1px solid ${navBorder}`, textAlign: 'center', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ margin: 0, color: '#1a237e' }}>🪙 Coin App</h2>
+            <button onClick={() => setIsMobileMenuOpen(false)} className="close-sidebar-btn" style={{ display: 'none', background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', color: textColor }}>✕</button>
           </div>
 
           <nav style={{ flex: 1, padding: '20px 10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -128,7 +141,7 @@ function AppContent() {
       )}
 
       {/* MAIN CONTENT AREA */}
-      <div style={{ flex: 1, marginLeft: showSidebar ? '250px' : '0', display: 'flex', flexDirection: 'column', minHeight: '100vh', paddingBottom: '40px' }}>
+      <div className="main-content" style={{ flex: 1, marginLeft: showNav ? '250px' : '0', display: 'flex', flexDirection: 'column', minHeight: '100vh', paddingBottom: '40px' }}>
         
         {needsPasswordChange && <ForcePasswordChange onClose={() => setNeedsPasswordChange(false)} />}
 
