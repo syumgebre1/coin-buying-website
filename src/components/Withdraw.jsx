@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../firebase';
-import { doc, getDoc, updateDoc, addDoc, collection } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, addDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { ThemeContext } from '../ThemeContext';
 
@@ -37,11 +37,9 @@ export default function Withdraw() {
     try {
       const userRef = doc(db, "users", auth.currentUser.uid);
       
-      // 1. Deduct coins immediately
       await updateDoc(userRef, { coins: userCoins - amountToWithdraw });
       setUserCoins(userCoins - amountToWithdraw);
 
-      // 2. Create withdrawal request in DB
       await addDoc(collection(db, "withdrawals"), {
         userId: auth.currentUser.uid,
         userEmail: auth.currentUser.email,
@@ -53,17 +51,33 @@ export default function Withdraw() {
         createdAt: new Date().toISOString()
       });
 
-      // 3. LOG IT IN TRANSACTION HISTORY
       await addDoc(collection(db, "transactions"), {
         userId: auth.currentUser.uid,
         userEmail: auth.currentUser.email,
-        amount: amountToWithdraw / coinRate, // The ETB value
-        coins: amountToWithdraw, // The coins deducted
+        amount: amountToWithdraw / coinRate,
+        coins: amountToWithdraw,
         method: `Withdraw to ${bankName}`,
         status: 'pending',
         receiptUrl: '',
         createdAt: new Date().toISOString()
       });
+
+      // NOTIFY ADMINS
+      const adminQuery = query(collection(db, "users"), where("role", "==", "admin"));
+      const adminSnap = await getDocs(adminQuery);
+      const adminNotifs = [];
+      adminSnap.forEach((adminDoc) => {
+        adminNotifs.push(
+          addDoc(collection(db, "notifications"), {
+            userId: adminDoc.id,
+            message: `💸 New withdrawal request for ${amountToWithdraw / coinRate} ETB from ${auth.currentUser.email}`,
+            type: 'admin_alert',
+            read: false,
+            createdAt: new Date().toISOString()
+          })
+        );
+      });
+      await Promise.all(adminNotifs);
 
       toast.success("Withdrawal request submitted! Check history for status.");
       setBankName('');
@@ -81,7 +95,7 @@ export default function Withdraw() {
 
   return (
     <div style={{ maxWidth: '400px', margin: '0 auto', padding: '20px', color: textColor }}>
-      <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', marginBottom: '20px', color: textColor }}>← Back</button>
+      <button onClick={() => navigate('/dashboard')} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', marginBottom: '20px', color: textColor }}>← Back</button>
       
       <div style={{ backgroundColor: '#1a237e', color: 'white', padding: '20px', borderRadius: '12px', marginBottom: '20px', textAlign: 'center' }}>
         <h2 style={{ margin: 0 }}>Withdraw to ETB</h2>

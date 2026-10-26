@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../firebase';
-import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, query, where, getDocs } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
 export default function CardPaymentForm() {
@@ -39,12 +39,27 @@ export default function CardPaymentForm() {
     }
   };
 
-  const convertToBase64 = (file) => {
+  const compressImage = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = error => reject(error);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 600;
+          const scaleSize = MAX_WIDTH / img.width;
+          canvas.width = MAX_WIDTH;
+          canvas.height = img.height * scaleSize;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+          resolve(compressedBase64);
+        };
+        img.onerror = (error) => reject(error);
+      };
+      reader.onerror = (error) => reject(error);
     });
   };
 
@@ -59,9 +74,10 @@ export default function CardPaymentForm() {
     try {
       let receiptBase64 = "";
       if (receiptFile) {
-        receiptBase64 = await convertToBase64(receiptFile);
+        receiptBase64 = await compressImage(receiptFile);
       }
 
+      // 1. Save the transaction
       await addDoc(collection(db, "transactions"), {
         userId: auth.currentUser.uid,
         userEmail: auth.currentUser.email,
@@ -72,19 +88,36 @@ export default function CardPaymentForm() {
         receiptUrl: receiptBase64,
         createdAt: new Date().toISOString()
       });
+
+      // 2. Notify all Admins about the new pending deposit
+      const adminQuery = query(collection(db, "users"), where("role", "==", "admin"));
+      const adminSnap = await getDocs(adminQuery);
+      const adminNotifs = [];
+      adminSnap.forEach((adminDoc) => {
+        adminNotifs.push(
+          addDoc(collection(db, "notifications"), {
+            userId: adminDoc.id,
+            message: `💰 New pending deposit of ${coins} Coins from ${auth.currentUser.email}`,
+            type: 'admin_alert',
+            read: false,
+            createdAt: new Date().toISOString()
+          })
+        );
+      });
+      await Promise.all(adminNotifs);
       
       toast.success("Payment submitted! Waiting for Admin approval.");
       navigate('/success');
     } catch (error) {
       console.error(error);
-      toast.error("Payment failed. Try again.");
+      toast.error("Payment failed. Image might be too large.");
     }
     setLoading(false);
   };
 
   return (
     <div style={{ maxWidth: '400px', margin: '0 auto', textAlign: 'left', paddingBottom: '40px' }}>
-      <button onClick={() => navigate("/dashboard")} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', marginBottom: '20px' }}>← Back</button>
+      <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', marginBottom: '20px' }}>← Back</button>
       <h2 style={{ textAlign: 'center' }}>Checkout</h2>
       
       <div style={{ backgroundColor: '#f5f5f5', padding: '15px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center', color: '#000' }}>
@@ -117,7 +150,7 @@ export default function CardPaymentForm() {
         </div>
         
         <button type="submit" disabled={loading} style={{ padding: '15px', backgroundColor: '#1a237e', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', cursor: 'pointer', fontWeight: 'bold' }}>
-          {loading ? 'Uploading...' : 'Submit Payment'}
+          {loading ? 'Compressing & Uploading...' : 'Submit Payment'}
         </button>
       </form>
     </div>
