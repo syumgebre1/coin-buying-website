@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../firebase';
-import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, runTransaction } from 'firebase/firestore';
 import { ThemeContext } from '../ThemeContext';
 import toast from 'react-hot-toast';
 
@@ -14,23 +14,33 @@ export default function Friends() {
   const [selectedFriend, setSelectedFriend] = useState(null);
   const { darkMode } = useContext(ThemeContext);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!auth.currentUser) return;
-      const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
-      if (userDoc.exists()) {
-        const data = userDoc.data();
-        setProfile(data);
+  const fetchFriendsData = async () => {
+    if (!auth.currentUser) return;
+    const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+    if (userDoc.exists()) {
+      const data = userDoc.data();
+      setProfile(data);
+      
+      if (data.friends && data.friends.length > 0) {
+        // Fetch friends details. We fetch them individually to avoid 'in' query limits.
+        const friendPromises = data.friends.map(email => 
+          getDocs(query(collection(db, "users"), where("email", "==", email)))
+        );
+        const friendSnaps = await Promise.all(friendPromises);
         
-        // Fetch friends details
-        if (data.friends && data.friends.length > 0) {
-          const q = query(collection(db, "users"), where("email", "in", data.friends));
-          const snap = await getDocs(q);
-          setFriends(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        }
+        const friendsList = [];
+        friendSnaps.forEach(snap => {
+          if (!snap.empty) {
+            friendsList.push({ id: snap.docs[0].id, ...snap.docs[0].data() });
+          }
+        });
+        setFriends(friendsList);
       }
-    };
-    fetchData();
+    }
+  };
+
+  useEffect(() => {
+    fetchFriendsData();
   }, []);
 
   const addFriend = async () => {
@@ -39,7 +49,6 @@ export default function Friends() {
     if (profile.friends?.includes(searchEmail)) return toast.error("Already friends!");
 
     try {
-      // Find user to add
       const q = query(collection(db, "users"), where("email", "==", searchEmail));
       const snap = await getDocs(q);
       
@@ -49,36 +58,54 @@ export default function Friends() {
       await updateDoc(doc(db, "users", auth.currentUser.uid), { friends: newFriendsList });
       
       setProfile({ ...profile, friends: newFriendsList });
-      setFriends([...friends, snap.docs[0].data()]);
       setSearchEmail('');
       toast.success("Friend added successfully!");
+      fetchFriendsData(); // Refresh the list
     } catch (e) {
+      console.error(e);
       toast.error("Error adding friend.");
     }
   };
 
   const sendCoins = async () => {
     const amount = Number(sendAmount);
-    if (amount <= 0 || amount > profile.coins) return toast.error("Invalid amount.");
+    if (amount <= 0 || amount > profile.coins) return toast.error("Invalid amount or insufficient funds.");
     if (!selectedFriend) return toast.error("Select a friend first.");
 
     try {
-      // Deduct from sender
-      await updateDoc(doc(db, "users", auth.currentUser.uid), { coins: profile.coins - amount });
-      
-      // Add to receiver
-      const friendRef = doc(db, "users", selectedFriend.id);
-      const friendSnap = await getDoc(friendRef);
-      if (friendSnap.exists()) {
-        await updateDoc(friendRef, { coins: (friendSnap.data().coins || 0) + amount });
-      }
+      const senderRef = doc(db, "users", auth.currentUser.uid);
+      const receiverRef = doc(db, "users", selectedFriend.id);
+
+      // Use a transaction to ensure both updates succeed or fail together
+      await runTransaction(db, async (transaction) => {
+        const senderDoc = await transaction.get(senderRef);
+        const receiverDoc = await transaction.get(receiverRef);
+
+        if (!senderDoc.exists() || !receiverDoc.exists()) {
+          throw "User document does not exist!";
+        }
+
+        const senderBalance = senderDoc.data().coins || 0;
+        const receiverBalance = receiverDoc.data().coins || 0;
+
+        if (senderBalance < amount) {
+          throw "Insufficient funds!";
+        }
+
+        transaction.update(senderRef, { coins: senderBalance - amount });
+        transaction.update(receiverRef, { coins: receiverBalance + amount });
+      });
 
       toast.success(`Sent ${amount} coins to ${selectedFriend.email}!`);
+      
+      // Update local UI
       setProfile({ ...profile, coins: profile.coins - amount });
+      setFriends(friends.map(f => f.id === selectedFriend.id ? { ...f, coins: (f.coins || 0) + amount } : f));
       setSendAmount('');
       setSelectedFriend(null);
     } catch (e) {
-      toast.error("Transfer failed.");
+      console.error("Transaction failed: ", e);
+      toast.error(typeof e === 'string' ? e : "Transfer failed. Please try again.");
     }
   };
 
@@ -101,7 +128,7 @@ export default function Friends() {
       <div style={{ backgroundColor: cardBg, border: `1px solid ${cardBorder}`, padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
         <h3 style={{ margin: '0 0 10px 0' }}>Add a Friend</h3>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <input type="email" placeholder="Enter friend's email" value={searchEmail} onChange={(e) => setSearchEmail(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '4px', border: `1px solid ${cardBorder}` }} />
+          <input type="email" placeholder="Enter friend's email" value={searchEmail} onChange={(e) => setSearchEmail(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '4px', border: `1px solid ${cardBorder}`, color: textColor, backgroundColor: darkMode ? '#121212' : 'white' }} />
           <button onClick={addFriend} style={{ padding: '10px 20px', backgroundColor: '#4caf50', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>Add</button>
         </div>
       </div>
@@ -117,7 +144,7 @@ export default function Friends() {
                   <strong>{friend.email}</strong>
                   <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>Balance: 🪙 {friend.coins || 0}</p>
                 </div>
-                <button onClick={() => setSelectedFriend(friend)} style={{ padding: '5px 10px', backgroundColor: '#f57c00', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Send Coins</button>
+                <button onClick={() => setSelectedFriend(friend)} style={{ padding: '5px 10px', backgroundColor: '#f57c00', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>Send Coins</button>
               </div>
             ))}
           </div>
