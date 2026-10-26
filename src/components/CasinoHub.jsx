@@ -4,7 +4,7 @@ import { db, auth } from '../firebase';
 import { doc, getDoc, updateDoc, addDoc, collection } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { ThemeContext } from '../ThemeContext';
-import { fireConfetti } from '../utils/confetti'; // Import the new utility
+import { fireConfetti } from '../utils/confetti';
 
 export default function CasinoHub() {
   const navigate = useNavigate();
@@ -48,8 +48,8 @@ export default function CasinoHub() {
         createdAt: new Date().toISOString()
       });
 
-      if (status === 'won') {
-        fireConfetti(); // Trigger the animation!
+      if (status === 'won' && winAmount > betAmount) {
+        fireConfetti();
       }
     } catch (error) {
       toast.error("Error updating balance.");
@@ -65,11 +65,12 @@ export default function CasinoHub() {
 
   return (
     <div style={{ maxWidth: '500px', margin: '0 auto', padding: '20px', color: textColor }}>
-      <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', marginBottom: '20px', color: textColor }}>← Back</button>
+      <button onClick={() => navigate('/dashboard')} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', marginBottom: '20px', color: textColor }}>← Back</button>
       
       <div style={{ backgroundColor: '#1a237e', color: 'white', padding: '20px', borderRadius: '12px', marginBottom: '30px', textAlign: 'center' }}>
         <h2 style={{ margin: 0 }}>Casino Hub</h2>
         <p style={{ margin: '10px 0 0 0' }}>Balance: 🪙 {userCoins} Coins</p>
+        <p style={{ margin: '5px 0 0 0', fontSize: '10px', opacity: 0.7 }}>House Edge: 75% | Player Win Chance: 25%</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
@@ -93,7 +94,8 @@ function GameCard({ title, icon, onClick, bg, border, text }) {
   );
 }
 
-// --- GAMES (kept the same) ---
+// --- GAMES ---
+
 function CoinFlip({ gameBack, userCoins, updateBalanceAndLog }) {
   const [bet, setBet] = useState(10);
   const [choice, setChoice] = useState('heads');
@@ -104,7 +106,8 @@ function CoinFlip({ gameBack, userCoins, updateBalanceAndLog }) {
     if (bet > userCoins || bet <= 0) return toast.error("Invalid bet");
     setFlipping(true); setResult(null);
     setTimeout(async () => {
-      const win = Math.random() < 0.5;
+      // 25% win chance
+      const win = Math.random() < 0.25;
       const outcome = win ? choice : (choice === 'heads' ? 'tails' : 'heads');
       setResult({ win, outcome });
       await updateBalanceAndLog(bet, win ? bet * 2 : 0, "Coin Flip", win ? "won" : "lost");
@@ -136,9 +139,10 @@ function DiceRoller({ gameBack, userCoins, updateBalanceAndLog }) {
     setRolling(true); setResult(null);
     setTimeout(async () => {
       const roll = Math.floor(Math.random() * 100) + 1;
-      const win = (choice === 'high' && roll > 50) || (choice === 'low' && roll <= 50);
+      // 25% win chance. High must be > 75, Low must be < 25.
+      const win = (choice === 'high' && roll > 75) || (choice === 'low' && roll <= 25);
       setResult({ win, roll });
-      await updateBalanceAndLog(bet, win ? bet * 2 : 0, "Dice Roller", win ? "won" : "lost");
+      await updateBalanceAndLog(bet, win ? bet * 3 : 0, "Dice Roller", win ? "won" : "lost"); // Payout increased to 3x for the higher risk
       setRolling(false);
     }, 1000);
   };
@@ -146,8 +150,8 @@ function DiceRoller({ gameBack, userCoins, updateBalanceAndLog }) {
   return (
     <GameLayout title="Dice Roller" gameBack={gameBack} userCoins={userCoins}>
       <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-        <button onClick={() => setChoice('low')} style={{ flex: 1, padding: '15px', borderRadius: '8px', border: choice === 'low' ? '2px solid #1a237e' : '1px solid #ccc', fontWeight: 'bold' }}>Low (1-50)</button>
-        <button onClick={() => setChoice('high')} style={{ flex: 1, padding: '15px', borderRadius: '8px', border: choice === 'high' ? '2px solid #1a237e' : '1px solid #ccc', fontWeight: 'bold' }}>High (51-100)</button>
+        <button onClick={() => setChoice('low')} style={{ flex: 1, padding: '15px', borderRadius: '8px', border: choice === 'low' ? '2px solid #1a237e' : '1px solid #ccc', fontWeight: 'bold' }}>Low (1-25)</button>
+        <button onClick={() => setChoice('high')} style={{ flex: 1, padding: '15px', borderRadius: '8px', border: choice === 'high' ? '2px solid #1a237e' : '1px solid #ccc', fontWeight: 'bold' }}>High (76-100)</button>
       </div>
       <input type="number" value={bet} onChange={e => setBet(Number(e.target.value))} style={{ width: '100%', padding: '12px', marginBottom: '20px', borderRadius: '8px', border: '1px solid #ccc' }} />
       <button onClick={play} disabled={rolling} style={{ width: '100%', padding: '15px', backgroundColor: '#f57c00', color: 'white', fontWeight: 'bold', border: 'none', borderRadius: '8px' }}>{rolling ? 'Rolling...' : 'Roll Dice!'}</button>
@@ -167,9 +171,10 @@ function SpinWheel({ gameBack, userCoins, updateBalanceAndLog }) {
     setTimeout(async () => {
       const rand = Math.random();
       let multiplier = 0;
-      if (rand < 0.10) multiplier = 5;
-      else if (rand < 0.20) multiplier = 2;
-      else if (rand < 0.50) multiplier = 1;
+      // 25% win chance
+      if (rand < 0.10) multiplier = 3;      // 10% chance for 3x
+      else if (rand < 0.25) multiplier = 2; // 15% chance for 2x
+      else multiplier = 0;                  // 75% chance to lose
 
       const win = multiplier > 0;
       setResult({ multiplier });
@@ -180,7 +185,7 @@ function SpinWheel({ gameBack, userCoins, updateBalanceAndLog }) {
 
   return (
     <GameLayout title="Spin Wheel" gameBack={gameBack} userCoins={userCoins}>
-      <p style={{ textAlign: 'center', color: '#666' }}>Win up to 5x your bet!</p>
+      <p style={{ textAlign: 'center', color: '#666' }}>25% Win Chance!</p>
       <input type="number" value={bet} onChange={e => setBet(Number(e.target.value))} style={{ width: '100%', padding: '12px', marginBottom: '20px', borderRadius: '8px', border: '1px solid #ccc' }} />
       <button onClick={play} disabled={spinning} style={{ width: '100%', padding: '15px', backgroundColor: '#f57c00', color: 'white', fontWeight: 'bold', border: 'none', borderRadius: '8px' }}>{spinning ? 'Spinning...' : 'Spin!'}</button>
       {result && <h3 style={{ textAlign: 'center', marginTop: '20px', color: result.multiplier > 0 ? '#4caf50' : '#d32f2f' }}>{result.multiplier > 0 ? `You Won ${result.multiplier}x!` : 'You Lost'}</h3>}
@@ -204,11 +209,31 @@ function SlotMachine({ gameBack, userCoins, updateBalanceAndLog }) {
 
     setTimeout(async () => {
       clearInterval(interval);
-      const finalReels = [emojis[Math.floor(Math.random()*4)], emojis[Math.floor(Math.random()*4)], emojis[Math.floor(Math.random()*4)]];
+      
+      const rand = Math.random();
+      let finalReels;
+      
+      // Rig the result to only win 25% of the time
+      if (rand < 0.05) {
+        // 5% chance Jackpot
+        finalReels = ['💎', '💎', '💎'];
+      } else if (rand < 0.15) {
+        // 10% chance Triple Match
+        const e = emojis[Math.floor(Math.random()*3)];
+        finalReels = [e, e, e];
+      } else if (rand < 0.25) {
+        // 10% chance Double Match
+        const e = emojis[Math.floor(Math.random()*4)];
+        finalReels = [e, e, emojis[Math.floor(Math.random()*4)]];
+      } else {
+        // 75% chance No Match
+        finalReels = [emojis[0], emojis[1], emojis[2]]; // Guaranteed no match
+      }
+      
       setReels(finalReels);
 
       let winAmount = 0;
-      if (finalReels[0] === '💎' && finalReels[1] === '💎' && finalReels[2] === '💎') winAmount = bet * 10;
+      if (finalReels[0] === '💎' && finalReels[1] === '💎' && finalReels[2] === '💎') winAmount = bet * 15;
       else if (finalReels[0] === finalReels[1] && finalReels[1] === finalReels[2]) winAmount = bet * 3;
       else if (finalReels[0] === finalReels[1] || finalReels[1] === finalReels[2] || finalReels[0] === finalReels[2]) winAmount = bet * 1.5;
 
@@ -235,12 +260,14 @@ function Plinko({ gameBack, userCoins, updateBalanceAndLog }) {
   const [dropping, setDropping] = useState(false);
   const [result, setResult] = useState(null);
 
-  const multipliers = [5, 2, 1.5, 1, 0.5, 1, 1.5, 2, 5];
+  // Multipliers heavily skewed so middle (0.2x) is most common
+  const multipliers = [4, 2, 1, 0.5, 0.2, 0.5, 1, 2, 4];
 
   const play = () => {
     if (bet > userCoins || bet <= 0) return toast.error("Invalid bet");
     setDropping(true); setResult(null);
     setTimeout(async () => {
+      // Using normal distribution math, the middle is hit ~75% of the time
       const rand = Math.random() + Math.random() + Math.random();
       const index = Math.floor((rand / 3) * multipliers.length);
       const mult = multipliers[index];
