@@ -20,7 +20,8 @@ import UserProfile from './components/UserProfile';
 import Leaderboard from './components/Leaderboard';
 import Withdraw from './components/Withdraw';
 import VerifyEmail from './components/VerifyEmail';
-import ForcePasswordChange from './components/ForcePasswordChange'; // Import new modal
+import ForcePasswordChange from './components/ForcePasswordChange';
+import ArifPayPayment from './components/ArifPayPayment'; // New Import
 import './App.css';
 
 function ProtectedRoute({ user, children }) {
@@ -50,7 +51,6 @@ function AppContent() {
           if (docSnap.exists()) {
             const data = docSnap.data();
             setIsAdmin(data.role === 'admin');
-            // Check if they need to change password
             if (data.hasChangedPassword === false) {
               setNeedsPasswordChange(true);
             } else {
@@ -80,7 +80,6 @@ function AppContent() {
   return (
     <div className="app-container" style={{ textAlign: 'center', padding: '20px', paddingBottom: '100px', color: darkMode ? '#fff' : '#000' }}>
       
-      {/* Show Password Change Modal if needed */}
       {needsPasswordChange && <ForcePasswordChange onClose={() => setNeedsPasswordChange(false)} />}
 
       <main className="content">
@@ -90,6 +89,7 @@ function AppContent() {
           <Route path="/dashboard" element={<ProtectedRoute user={user}><GetCoinsPage /></ProtectedRoute>} />
           <Route path="/custom" element={<ProtectedRoute user={user}><CustomAmountPage /></ProtectedRoute>} />
           <Route path="/payment" element={<ProtectedRoute user={user}><CardPaymentForm /></ProtectedRoute>} />
+          <Route path="/arifpay-payment" element={<ProtectedRoute user={user}><ArifPayPayment /></ProtectedRoute>} /> {/* New Route */}
           <Route path="/success" element={<ProtectedRoute user={user}><OrderConfirmation /></ProtectedRoute>} />
           <Route path="/history" element={<ProtectedRoute user={user}><TransactionHistory /></ProtectedRoute>} />
           <Route path="/invite" element={<ProtectedRoute user={user}><InviteRewards /></ProtectedRoute>} />

@@ -60,7 +60,7 @@ export default function GetCoinsPage() {
     const costInBirr = coins / coinRate;
     localStorage.setItem('buyAmount', costInBirr);
     localStorage.setItem('buyCoins', coins);
-    navigate('/payment');
+    navigate('/payment'); // All buttons go back to the working manual page
   };
 
   const redeemPromo = async () => {
@@ -99,7 +99,6 @@ export default function GetCoinsPage() {
         <h1 style={{ margin: '5px 0 0 0', fontSize: '36px' }}>🪙 {userCoins} <span style={{ fontSize: '16px' }}>Coins</span></h1>
       </div>
 
-      {/* QUICK ACTION BUTTONS */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
         <button onClick={() => navigate('/casino')} style={{ flex: 1, padding: '15px', backgroundColor: '#d32f2f', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>
           🎰 Casino

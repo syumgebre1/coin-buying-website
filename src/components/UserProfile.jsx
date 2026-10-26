@@ -4,6 +4,7 @@ import { db, auth } from '../firebase';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { ThemeContext } from '../ThemeContext';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import toast from 'react-hot-toast';
 import SupportChat from './SupportChat';
 
@@ -12,6 +13,7 @@ export default function UserProfile() {
   const [profile, setProfile] = useState(null);
   const [stats, setStats] = useState({ totalBets: 0, wins: 0, losses: 0 });
   const [withdrawals, setWithdrawals] = useState([]);
+  const [chartData, setChartData] = useState([]); // For the graph
   const [showChat, setShowChat] = useState(false);
   const { darkMode } = useContext(ThemeContext);
 
@@ -23,14 +25,25 @@ export default function UserProfile() {
 
       const q = query(collection(db, "transactions"), where("userId", "==", auth.currentUser.uid));
       const snapshot = await getDocs(q);
-      const txs = snapshot.docs.map(d => d.data());
+      const txs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       
+      // Calculate stats
       const bets = txs.filter(t => t.amount === 0);
       const wins = bets.filter(t => t.status === 'won').length;
       const losses = bets.filter(t => t.status === 'lost').length;
-
       setStats({ totalBets: bets.length, wins, losses });
 
+      // Build Chart Data (Last 10 transactions)
+      const sortedTxs = txs.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      const last10 = sortedTxs.slice(-10);
+      const graphData = last10.map((tx, index) => ({
+        name: `Tx ${index + 1}`,
+        coins: tx.coins,
+        type: tx.status
+      }));
+      setChartData(graphData);
+
+      // Fetch Withdrawals
       const wdQuery = query(collection(db, "withdrawals"), where("userId", "==", auth.currentUser.uid));
       const wdSnap = await getDocs(wdQuery);
       const wds = wdSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -79,7 +92,6 @@ export default function UserProfile() {
         <h2>{profile.email}</h2>
         <p style={{ color: '#666', margin: '5px 0' }}>Joined: {joinDate}</p>
         
-        {/* BADGES */}
         <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
           {profile.role === 'admin' && <span style={{ backgroundColor: '#ffcdd2', color: '#b71c1c', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>ADMIN</span>}
           {profile.isBanned && <span style={{ backgroundColor: '#d32f2f', color: 'white', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>BANNED</span>}
@@ -95,6 +107,25 @@ export default function UserProfile() {
           <p style={{ margin: 0, color: '#666' }}>Win Rate</p>
           <h2 style={{ margin: '10px 0 0 0', color: '#4caf50' }}>{winRate}%</h2>
         </div>
+      </div>
+
+      {/* NEW: EARNINGS GRAPH */}
+      <div style={{ backgroundColor: cardBg, border: `1px solid ${cardBorder}`, padding: '20px', borderRadius: '12px', marginBottom: '20px' }}>
+        <h3 style={{ margin: '0 0 15px 0' }}>Recent Activity Graph</h3>
+        {chartData.length > 0 ? (
+          <div style={{ width: '100%', height: 200 }}>
+            <ResponsiveContainer>
+              <LineChart data={chartData}>
+                <XAxis dataKey="name" stroke="#888" fontSize={10} />
+                <YAxis stroke="#888" fontSize={10} />
+                <Tooltip contentStyle={{ backgroundColor: darkMode ? '#333' : 'white', color: textColor }} />
+                <Line type="monotone" dataKey="coins" stroke="#1a237e" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 8 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <p style={{ textAlign: 'center', color: '#666', fontSize: '12px' }}>Play some games to see your chart!</p>
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>

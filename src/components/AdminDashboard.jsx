@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { collection, getDocs, doc, setDoc, getDoc, updateDoc, deleteDoc, addDoc, query, orderBy, onSnapshot, where } from 'firebase/firestore';
+import { CSVLink } from 'react-csv'; // Import CSVLink
 import toast from 'react-hot-toast';
 
 export default function AdminDashboard() {
@@ -11,7 +12,7 @@ export default function AdminDashboard() {
   const [newBankName, setNewBankName] = useState('');
   const [newBankAccount, setNewBankAccount] = useState('');
   const [users, setUsers] = useState([]);
-  const [searchQuery, setSearchQuery] = useState(''); // New search state
+  const [searchQuery, setSearchQuery] = useState('');
   const [transactions, setTransactions] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]); 
   const [promos, setPromos] = useState([]);
@@ -85,11 +86,20 @@ export default function AdminDashboard() {
     }
   };
 
-  // Filter users based on search
   const filteredUsers = users.filter(u => u.email.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const totalRevenue = transactions.filter(t => t.status === 'completed' && t.amount > 0 && !t.method.includes('Withdraw')).reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
   const totalCoinsSold = transactions.filter(t => t.status === 'completed' && t.amount > 0 && !t.method.includes('Withdraw')).reduce((sum, t) => sum + (Number(t.coins) || 0), 0);
+
+  // Prepare CSV Data
+  const csvData = transactions.map(tx => ({
+    Date: new Date(tx.createdAt).toLocaleString(),
+    User: tx.userEmail,
+    Method: tx.method,
+    Amount_Birr: tx.amount,
+    Coins: tx.coins,
+    Status: tx.status
+  }));
 
   const saveSettings = async () => {
     await setDoc(doc(db, "settings", "config"), { coinRate, banks });
@@ -178,7 +188,13 @@ export default function AdminDashboard() {
     <div style={{ maxWidth: '900px', margin: '0 auto', padding: '20px', textAlign: 'left' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
         <h2>Admin Dashboard</h2>
-        <button onClick={() => navigate('/dashboard')} style={{ padding: '10px', backgroundColor: '#1a237e', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Back to Site</button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          {/* NEW: DOWNLOAD CSV BUTTON */}
+          <CSVLink data={csvData} filename={"coin-app-transactions.csv"} style={{ padding: '10px', backgroundColor: '#4caf50', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', textDecoration: 'none', fontWeight: 'bold' }}>
+            ⬇️ Download Report
+          </CSVLink>
+          <button onClick={() => navigate('/dashboard')} style={{ padding: '10px', backgroundColor: '#1a237e', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Back to Site</button>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>

@@ -13,10 +13,13 @@
     "date-fns": "^4.4.0",
     "firebase": "^13.1.0",
     "jspdf": "^4.2.1",
+    "prop-types": "^15.8.1",
     "react": "^19.1.1",
+    "react-csv": "^2.2.2",
     "react-dom": "^19.1.1",
     "react-hot-toast": "^2.6.1",
-    "react-router-dom": "^7.18.4"
+    "react-router-dom": "^7.18.4",
+    "recharts": "^3.10.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
