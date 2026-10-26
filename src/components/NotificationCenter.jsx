@@ -21,9 +21,7 @@ export default function NotificationCenter() {
       const notifs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       notifs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       
-      // Limit display to latest 15 to prevent lag
       setNotifications(notifs.slice(0, 15));
-      
       const unread = notifs.filter(n => n.read === false).length;
       setUnreadCount(unread);
     });
@@ -62,10 +60,22 @@ export default function NotificationCenter() {
       </button>
 
       {isOpen && (
-        <div style={{ position: 'absolute', top: '45px', right: '0', width: '320px', backgroundColor: bg, border: `1px solid ${border}`, borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', zIndex: 2000, maxHeight: '400px', overflowY: 'auto' }}>
+        <div style={{ 
+          position: 'absolute', 
+          top: '50px', 
+          left: '0', // Align to the left so it doesn't go off-screen
+          width: '320px', 
+          backgroundColor: bg, 
+          border: `1px solid ${border}`, 
+          borderRadius: '12px', 
+          boxShadow: '0 10px 25px rgba(0,0,0,0.3)', 
+          zIndex: 3000, 
+          maxHeight: '400px', 
+          overflowY: 'auto' 
+        }}>
           <div style={{ padding: '15px', borderBottom: `1px solid ${border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: darkMode ? '#252525' : '#f8f9fa', borderTopLeftRadius: '12px', borderTopRightRadius: '12px' }}>
             <h4 style={{ margin: 0, color: text }}>Notifications</h4>
-            <button onClick={() => setIsOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', fontSize: '16px' }}>✕</button>
+            <button onClick={() => setIsOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', fontSize: '18px', fontWeight: 'bold' }}>✕</button>
           </div>
           
           {notifications.length === 0 ? (
@@ -73,8 +83,22 @@ export default function NotificationCenter() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {notifications.map((notif) => (
-                <div key={notif.id} style={{ padding: '15px', borderBottom: `1px solid ${border}`, backgroundColor: notif.read ? 'transparent' : (darkMode ? '#2a2a4a' : '#e8eaf6') }}>
-                  <p style={{ margin: '0 0 5px 0', fontSize: '13px', color: text, fontWeight: notif.read ? 'normal' : 'bold' }}>{notif.message}</p>
+                <div key={notif.id} style={{ 
+                  padding: '15px', 
+                  borderBottom: `1px solid ${border}`, 
+                  backgroundColor: notif.read ? 'transparent' : (darkMode ? '#2a2a4a' : '#e8eaf6') 
+                }}>
+                  <p style={{ 
+                    margin: '0 0 5px 0', 
+                    fontSize: '13px', 
+                    color: text, 
+                    fontWeight: notif.read ? 'normal' : 'bold',
+                    wordWrap: 'break-word', // This stops the text from being cut off
+                    whiteSpace: 'normal',
+                    lineHeight: '1.4'
+                  }}>
+                    {notif.message}
+                  </p>
                   <span style={{ fontSize: '10px', color: '#888' }}>{new Date(notif.createdAt).toLocaleString()}</span>
                 </div>
               ))}
