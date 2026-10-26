@@ -92,12 +92,20 @@ export default function AdminDashboard() {
     .map((tx, i) => ({ name: `Tx ${i+1}`, revenue: tx.amount }));
 
   // ... (Keep the rest of your existing helper functions: saveSettings, addBank, etc.)
+  const sendAnnouncement = async () => {
+    const msg = prompt("Enter announcement message for all users:");
+    if (msg) {
+      await addDoc(collection(db, "announcements"), { message: msg, createdAt: new Date().toISOString() });
+      toast.success("Announcement sent to all users!");
+    }
+  };
+
   const filteredUsers = users.filter(u => u.email.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
     <div style={{ maxWidth: '900px', margin: '0 auto', padding: '20px', textAlign: 'left' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-        <h2>Admin Dashboard</h2>
+        <div><h2 style={{ margin: 0 }}>Admin Dashboard</h2><button onClick={sendAnnouncement} style={{ marginTop: "5px", padding: "5px 10px", backgroundColor: "#f57c00", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "12px" }}>📢 Send Announcement</button></div>
         <button onClick={() => navigate('/dashboard')} style={{ padding: '10px', backgroundColor: '#1a237e', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Back to Site</button>
       </div>
 
