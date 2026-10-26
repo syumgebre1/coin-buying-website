@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <!-- Metallic Gold Gradient -->
+    <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF2A8" />
+      <stop offset="30%" stop-color="#F5D061" />
+      <stop offset="70%" stop-color="#D4AF37" />
+      <stop offset="100%" stop-color="#996515" />
+    </linearGradient>
+    
+    <!-- Deep Navy Gradient -->
+    <linearGradient id="navyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a237e" />
+      <stop offset="100%" stop-color="#0a0e29" />
+    </linearGradient>
+
+    <!-- Sunburst Pattern -->
+    <pattern id="sunburst" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="40" height="40" fill="url(#navyGradient)" />
+      <polygon points="20,0 40,40 0,40" fill="#ffffff" opacity="0.05" />
+    </pattern>
+  </defs>
+
+  <!-- Background with Sunburst -->
+  <rect width="512" height="512" fill="url(#sunburst)" />
+  
+  <!-- Outer Telsem Ring (Moved inward so it doesn't get cropped) -->
+  <circle cx="256" cy="256" r="180" fill="none" stroke="url(#goldGradient)" stroke-width="12" />
+  <circle cx="256" cy="256" r="170" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.3" />
+  
+  <!-- Telsem Border (Geometric repeating pattern) -->
+  <g stroke="url(#goldGradient)" stroke-width="6" fill="none">
+    <!-- Upper Telsem -->
+    <path d="M 100 256 L 120 236 L 140 256 L 160 236 L 180 256 L 200 236 L 220 256 L 240 236 L 260 256 L 280 236 L 300 256 L 320 236 L 340 256 L 360 236 L 380 256 L 400 236 L 420 256" />
+    <!-- Lower Telsem -->
+    <path d="M 100 276 L 120 296 L 140 276 L 160 296 L 180 276 L 200 296 L 220 276 L 240 296 L 260 276 L 280 296 L 300 276 L 320 296 L 340 276 L 360 296 L 380 276 L 400 296 L 420 276" />
+  </g>
+
+  <!-- Main Gold Coin (Centered) -->
+  <circle cx="256" cy="256" r="140" fill="url(#goldGradient)" />
+  
+  <!-- White Highlight on Coin -->
+  <circle cx="256" cy="256" r="130" fill="none" stroke="#ffffff" stroke-width="4" opacity="0.4" />
+
+  <!-- Center Motif: Ethiopian Cross -->
+  <g fill="#0a0e29" transform="translate(256, 256)">
+    <!-- Center Diamond -->
+    <polygon points="0,-25 20,0 0,25 -20,0" />
+    
+    <!-- 4 Cross Arms -->
+    <rect x="-8" y="-100" width="16" height="50" rx="3" />
+    <rect x="-8" y="50" width="16" height="50" rx="3" />
+    <rect x="-100" y="-8" width="50" height="16" rx="3" />
+    <rect x="50" y="-8" width="50" height="16" rx="3" />
+  </g>
+
+  <!-- Three White Stars (Ethiopian Flag Unity) - Moved closer to center -->
+  <g fill="#ffffff" opacity="0.9">
+    <polygon points="256,100 258,106 264,106 259,110 261,116 256,112 251,116 253,110 248,106 254,106" />
+    <polygon points="230,110 232,116 238,116 233,120 235,126 230,122 225,126 227,120 222,116 228,116" />
+    <polygon points="282,110 284,116 290,116 285,120 287,126 282,122 277,126 279,120 274,116 280,116" />
+  </g>
+
+  <!-- Sparkles -->
+  <circle cx="340" cy="160" r="5" fill="#ffffff" opacity="0.8" />
+  <circle cx="170" cy="350" r="6" fill="#ffffff" opacity="0.6" />
+</svg>

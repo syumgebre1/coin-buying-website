@@ -3,7 +3,7 @@
   "name": "Coin Buying & Casino Platform",
   "icons": [
     {
-      "src": "/vite.svg",
+      "src": "/logo.svg",
       "sizes": "192x192 512x512",
       "type": "image/svg+xml"
     }

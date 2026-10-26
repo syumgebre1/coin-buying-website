@@ -10,6 +10,7 @@ export default function GetCoinsPage() {
   const [userCoins, setUserCoins] = useState(0);
   const [promoCode, setPromoCode] = useState('');
   const [lastCheckIn, setLastCheckIn] = useState(null);
+  const [streak, setStreak] = useState(0);
   const [coinRate, setCoinRate] = useState(10);
   const { darkMode } = useContext(ThemeContext);
 
@@ -18,8 +19,10 @@ export default function GetCoinsPage() {
 
     const unsubscribeUser = onSnapshot(doc(db, "users", auth.currentUser.uid), (docSnap) => {
       if (docSnap.exists()) {
-        setUserCoins(docSnap.data().coins || 0);
-        setLastCheckIn(docSnap.data().lastCheckIn || null);
+        const data = docSnap.data();
+        setUserCoins(data.coins || 0);
+        setLastCheckIn(data.lastCheckIn || null);
+        setStreak(data.streak || 0);
       }
     });
 
@@ -29,10 +32,7 @@ export default function GetCoinsPage() {
       }
     });
 
-    return () => {
-      unsubscribeUser();
-      unsubscribeSettings();
-    };
+    return () => { unsubscribeUser(); unsubscribeSettings(); };
   }, []);
 
   const handleDailyBonus = async () => {
@@ -41,16 +41,30 @@ export default function GetCoinsPage() {
       return toast.error("You already claimed your daily bonus today!");
     }
 
+    // Calculate new streak
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const wasYesterday = lastCheckIn === yesterday.toDateString();
+    
+    const newStreak = wasYesterday ? streak + 1 : 1;
+    
+    // Calculate reward based on streak
+    let reward = 20;
+    if (newStreak >= 7) reward = 150;
+    else if (newStreak >= 5) reward = 100;
+    else if (newStreak >= 3) reward = 50;
+
     try {
       const userRef = doc(db, "users", auth.currentUser.uid);
       const userSnap = await getDoc(userRef);
       const currentCoins = userSnap.data().coins || 0;
       
       await updateDoc(userRef, { 
-        coins: currentCoins + 20,
-        lastCheckIn: today
+        coins: currentCoins + reward,
+        lastCheckIn: today,
+        streak: newStreak
       });
-      toast.success("Daily Bonus Claimed! +20 Coins 🎁");
+      toast.success(`Day ${newStreak} Streak! Claimed +${reward} Coins 🎁`);
     } catch (error) {
       toast.error("Error claiming bonus.");
     }
@@ -60,7 +74,7 @@ export default function GetCoinsPage() {
     const costInBirr = coins / coinRate;
     localStorage.setItem('buyAmount', costInBirr);
     localStorage.setItem('buyCoins', coins);
-    navigate('/payment'); // All buttons go back to the working manual page
+    navigate('/payment');
   };
 
   const redeemPromo = async () => {
@@ -107,10 +121,10 @@ export default function GetCoinsPage() {
           💸 Withdraw
         </button>
         <button onClick={handleDailyBonus} disabled={hasCheckedIn} style={{ flex: 1, padding: '15px', backgroundColor: hasCheckedIn ? '#9e9e9e' : '#f57c00', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: hasCheckedIn ? 'not-allowed' : 'pointer' }}>
-          {hasCheckedIn ? '✓' : '🎁 Bonus'}
+          {hasCheckedIn ? 'Claimed ✓' : `🔥 Day ${streak + 1}`}
         </button>
       </div>
-      <p style={{ fontSize: '11px', color: '#666', marginBottom: '20px' }}>Daily bonus gives 20 free coins.</p>
+      <p style={{ fontSize: '11px', color: '#666', marginBottom: '20px' }}>Streak Bonus: Day 3 (50🪙), Day 5 (100🪙), Day 7 (150🪙)</p>
 
       <h2 style={{ color: textColor }}>Buy Coins</h2>
       <p style={{ fontSize: '12px', color: '#666', marginBottom: '15px' }}>Current Rate: 1 Birr = {coinRate} Coins</p>
