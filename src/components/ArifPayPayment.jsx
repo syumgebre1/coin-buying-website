@@ -39,7 +39,7 @@ export default function ArifPayPayment() {
             name: `${coins} Coins`,
             quantity: 1,
             price: amount,
-            description: "Coin App Top-up"
+            description: "SYUM BET Top-up"
           }
         ],
         beneficiaries: [

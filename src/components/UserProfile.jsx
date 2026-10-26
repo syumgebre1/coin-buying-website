@@ -56,9 +56,9 @@ export default function UserProfile() {
 
   const shareReferral = () => {
     if (!profile?.inviteCode) return;
-    const text = `Join me on Coin App and we both get bonuses! Use my code: ${profile.inviteCode}`;
+    const text = `Join me on SYUM BET and we both get bonuses! Use my code: ${profile.inviteCode}`;
     if (navigator.share) {
-      navigator.share({ title: 'Coin App', text: text, url: window.location.origin });
+      navigator.share({ title: 'SYUM BET', text: text, url: window.location.origin });
     } else {
       navigator.clipboard.writeText(text);
       toast.success("Referral message copied to clipboard!");

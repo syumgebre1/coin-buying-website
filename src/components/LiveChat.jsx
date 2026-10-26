@@ -53,7 +53,7 @@ export default function LiveChat() {
       
       <div style={{ backgroundColor: '#1a237e', color: 'white', padding: '15px', borderRadius: '8px', textAlign: 'center', marginBottom: '15px' }}>
         <h2 style={{ margin: 0 }}>💬 Global Lobby</h2>
-        <p style={{ margin: '5px 0 0 0', fontSize: '12px', opacity: 0.8 }}>Chat with everyone in the Coin App community!</p>
+        <p style={{ margin: '5px 0 0 0', fontSize: '12px', opacity: 0.8 }}>Chat with everyone in the SYUM BET community!</p>
       </div>
 
       <div style={{ flex: 1, backgroundColor: bg, border: `1px solid ${border}`, borderRadius: '8px', padding: '15px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>

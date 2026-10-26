@@ -26,7 +26,7 @@ export default function OrderConfirmation() {
       doc.setTextColor(255, 255, 255);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(28);
-      doc.text("COIN APP", 105, 20, { align: "center" });
+      doc.text("SYUM BET", 105, 20, { align: "center" });
       doc.setFontSize(12);
       doc.setFont("helvetica", "normal");
       doc.text("PREMIUM PURCHASE RECEIPT", 105, 30, { align: "center" });
@@ -96,7 +96,7 @@ export default function OrderConfirmation() {
 
       // 5. Footer
       doc.setFontSize(10);
-      doc.text("Thank you for choosing Coin App.", 20, 200);
+      doc.text("Thank you for choosing SYUM BET.", 20, 200);
       doc.text("Please keep this receipt", 20, 205);
       doc.text("for your records.", 20, 210);
       doc.text("Built by Syum Teame", 20, 260);

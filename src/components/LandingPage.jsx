@@ -107,7 +107,7 @@ export default function LandingPage() {
 
       {/* FOOTER */}
       <div style={{ backgroundColor: '#1a237e', color: 'white', padding: '30px', textAlign: 'center' }}>
-        <p style={{ margin: 0 }}>© {new Date().getFullYear()} Coin App. Built by <a href="https://syum-portfolio.netlify.app" target="_blank" rel="noreferrer" style={{ color: '#f57c00', fontWeight: 'bold', textDecoration: 'none' }}>SYUM TEAME</a></p>
+        <p style={{ margin: 0 }}>© {new Date().getFullYear()} SYUM BET. Built by <a href="https://syum-portfolio.netlify.app" target="_blank" rel="noreferrer" style={{ color: '#f57c00', fontWeight: 'bold', textDecoration: 'none' }}>SYUM TEAME</a></p>
       </div>
 
     </div>
