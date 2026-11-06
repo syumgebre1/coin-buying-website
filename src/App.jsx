@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
-import { auth, db } from './firebase';
+import { auth, db } from './firebaseConfig';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, onSnapshot, collection, query, orderBy, limit } from 'firebase/firestore';
 import { Toaster } from 'react-hot-toast';
@@ -27,6 +27,7 @@ import Lottery from './components/Lottery';
 import Friends from './components/Friends';
 import LiveChat from './components/LiveChat';
 import NotificationCenter from './components/NotificationCenter';
+import VerifyReceipt from './components/VerifyReceipt';
 import './App.css';
 
 function ProtectedRoute({ user, children }) {
@@ -107,14 +108,7 @@ function AppContent() {
     return () => unsubscribe();
   }, [user, lastAnnouncement]);
 
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: darkMode ? '#121212' : '#f5f5f5', color: darkMode ? 'white' : 'black' }}>
-        <h2>Loading SYUM BET...</h2>
-        <div style={{ width: '40px', height: '40px', border: '4px solid #ccc', borderTop: '4px solid #1a237e', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '20px 0' }}></div>
-      </div>
-    );
-  }
+  if (loading) return <div style={{ textAlign: 'center', marginTop: '50px' }}>Loading...</div>;
 
   if (isMaintenance && !isAdmin && location.pathname !== '/') {
     return (
@@ -130,7 +124,7 @@ function AppContent() {
   const navBg = darkMode ? '#1e1e1e' : 'white';
   const navBorder = darkMode ? '#333' : '#eee';
   const textColor = darkMode ? '#fff' : '#1a237e';
-  const showNav = user && user.emailVerified && location.pathname !== '/';
+  const showNav = user && user.emailVerified && location.pathname !== '/' && location.pathname !== '/admin';
 
   const sidebarStyle = isMobile ? {
     width: '250px', backgroundColor: navBg, borderRight: `1px solid ${navBorder}`, display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, bottom: 0, left: 0, zIndex: 1000, overflowY: 'auto', transition: 'transform 0.3s ease',
@@ -140,7 +134,6 @@ function AppContent() {
   return (
     <div className="app-container" style={{ display: 'flex', minHeight: '100vh', color: darkMode ? '#fff' : '#000' }}>
       
-      {/* MOBILE TOP BAR - Added Notification Center back here */}
       {showNav && isMobile && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: '60px', backgroundColor: navBg, borderBottom: `1px solid ${navBorder}`, zIndex: 900, display: 'flex', alignItems: 'center', padding: '0 20px', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -155,13 +148,10 @@ function AppContent() {
         <div onClick={() => setIsMobileMenuOpen(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 999 }}></div>
       )}
 
-      {/* SIDEBAR - Added Notification Center here for Desktop */}
       {showNav && (
         <aside style={sidebarStyle}>
           <div style={{ padding: '20px', borderBottom: `1px solid ${navBorder}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ margin: 0, color: '#1a237e' }}>🎰 SYUM BET</h2>
-            
-            {/* Show bell in sidebar on desktop, but hide it on mobile sidebar since it's in top bar */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               {!isMobile && <NotificationCenter />}
               {isMobile && <button onClick={() => setIsMobileMenuOpen(false)} style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', color: textColor }}>✕</button>}
@@ -180,7 +170,7 @@ function AppContent() {
             <Link to="/profile" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: location.pathname === '/profile' ? 'white' : textColor, backgroundColor: location.pathname === '/profile' ? '#1a237e' : 'transparent', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>👤 Profile</Link>
             
             {isAdmin && (
-              <Link to="/admin" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: location.pathname === '/admin' ? 'white' : '#d32f2f', backgroundColor: location.pathname === '/admin' ? '#d32f2f' : 'transparent', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px', borderTop: `1px solid ${navBorder}`, paddingTop: '20px' }}>🛡️ Admin</Link>
+              <Link to="/admin" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: '#d32f2f', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px', borderTop: `1px solid ${navBorder}`, paddingTop: '20px' }}>🛡️ Admin</Link>
             )}
           </nav>
 
@@ -195,7 +185,7 @@ function AppContent() {
 
       <div style={{ flex: 1, marginLeft: (showNav && !isMobile) ? '250px' : '0', display: 'flex', flexDirection: 'column', minHeight: '100vh', paddingTop: (showNav && isMobile) ? '70px' : '0', paddingBottom: '40px' }}>
         {needsPasswordChange && <ForcePasswordChange onClose={() => setNeedsPasswordChange(false)} />}
-        <main style={{ flex: 1, padding: '20px' }}>
+        <main style={{ flex: 1, padding: location.pathname === '/admin' ? '0' : '20px' }}>
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={!user ? <LoginPage /> : <Navigate to="/dashboard" />} />
@@ -215,11 +205,14 @@ function AppContent() {
             <Route path="/lottery" element={<ProtectedRoute user={user}><Lottery /></ProtectedRoute>} />
             <Route path="/admin" element={<AdminRoute user={user} isAdmin={isAdmin}><AdminDashboard /></AdminRoute>} />
             <Route path="/verify" element={<VerifyEmail user={user} refreshUser={(u) => setUser({ ...u })} />} />
+            <Route path="/verify-statement" element={<VerifyReceipt />} />
           </Routes>
         </main>
-        <footer style={{ backgroundColor: darkMode ? '#121212' : '#f1f1f1', borderTop: `1px solid ${navBorder}`, padding: '10px', textAlign: 'center', fontSize: '12px', color: darkMode ? '#aaa' : '#555' }}>
-          Built with ❤️ by <a href="https://syum-portfolio.netlify.app" target="_blank" rel="noreferrer" style={{ color: '#1a237e', fontWeight: 'bold', textDecoration: 'none' }}>SYUM TEAME</a>
-        </footer>
+        {location.pathname !== '/admin' && (
+          <footer style={{ backgroundColor: darkMode ? '#121212' : '#f1f1f1', borderTop: `1px solid ${navBorder}`, padding: '10px', textAlign: 'center', fontSize: '12px', color: darkMode ? '#aaa' : '#555' }}>
+            Built with ❤️ by <a href="https://syum-portfolio.netlify.app" target="_blank" rel="noreferrer" style={{ color: '#1a237e', fontWeight: 'bold', textDecoration: 'none' }}>SYUM TEAME</a>
+          </footer>
+        )}
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { db, auth } from '../firebase';
+import { db, auth } from '../firebaseConfig';
 import { doc, getDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 

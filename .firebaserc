@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "coin-buying-website"
-  }
+  },
+  "targets": {
+    "coin-buying-website": {
+      "hosting": {
+        "syum-bet": [
+          "syum-bet"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

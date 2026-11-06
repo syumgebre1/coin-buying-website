@@ -1,9 +1,30 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { db, auth } from '../firebase';
-import { doc, getDoc, updateDoc, addDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { db, auth } from '../firebaseConfig';
+import { doc, getDoc, updateDoc, addDoc, collection, query, where, getDocs , Timestamp } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { ThemeContext } from '../ThemeContext';
+
+
+// Feature #5: 24-hour withdrawal lock
+const WITHDRAWAL_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
+async function checkWithdrawalLock(userId) {
+  const { getDoc, doc } = await import('firebase/firestore');
+  const { db } = await import('../firebaseConfig');
+  const snap = await getDoc(doc(db, 'users', userId));
+  if (!snap.exists()) return { allowed: true };
+  const last = snap.data().lastWithdrawalAt;
+  if (!last) return { allowed: true };
+  const lastMs = last?.toMillis ? last.toMillis() : new Date(last).getTime();
+  const remaining = WITHDRAWAL_COOLDOWN_MS - (Date.now() - lastMs);
+  if (remaining > 0) {
+    const hrs = Math.ceil(remaining / 3600000);
+    return { allowed: false, message: `You can withdraw again in ${hrs}h.` };
+  }
+  return { allowed: true };
+}
+
 
 export default function Withdraw() {
   const navigate = useNavigate();
@@ -12,6 +33,8 @@ export default function Withdraw() {
   const [bankName, setBankName] = useState('');
   const [accountNo, setAccountNo] = useState('');
   const [amountToWithdraw, setAmountToWithdraw] = useState(100);
+  const [enteredPin, setEnteredPin] = useState('');
+  const [savedPin, setSavedPin] = useState('');
   const [loading, setLoading] = useState(false);
   const { darkMode } = useContext(ThemeContext);
 
@@ -19,8 +42,10 @@ export default function Withdraw() {
     const fetchData = async () => {
       if (!auth.currentUser) return;
       const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
-      if (userDoc.exists()) setUserCoins(userDoc.data().coins || 0);
-
+      if (userDoc.exists()) {
+        setUserCoins(userDoc.data().coins || 0);
+        setSavedPin(userDoc.data().withdrawPin || '');
+      }
       const settingsDoc = await getDoc(doc(db, "settings", "config"));
       if (settingsDoc.exists()) setCoinRate(settingsDoc.data().coinRate || 10);
     };
@@ -29,6 +54,8 @@ export default function Withdraw() {
 
   const handleWithdraw = async (e) => {
     e.preventDefault();
+    if (!savedPin) return toast.error("Please set a Withdrawal PIN in your Profile first.");
+    if (enteredPin !== savedPin) return toast.error("Incorrect PIN. Access denied.");
     if (amountToWithdraw > userCoins) return toast.error("Not enough coins!");
     if (amountToWithdraw < 50) return toast.error("Minimum withdrawal is 50 coins.");
     if (!bankName || !accountNo) return toast.error("Please enter bank details.");
@@ -36,9 +63,13 @@ export default function Withdraw() {
     setLoading(true);
     try {
       const userRef = doc(db, "users", auth.currentUser.uid);
-      
       await updateDoc(userRef, { coins: userCoins - amountToWithdraw });
       setUserCoins(userCoins - amountToWithdraw);
+
+      // FRAUD DETECTION CHECK
+      const wdCheckQuery = query(collection(db, "withdrawals"), where("userId", "==", auth.currentUser.uid));
+      const wdCheckSnap = await getDocs(wdCheckQuery);
+      const userWithdrawalsToday = wdCheckSnap.docs.filter(d => new Date(d.data().createdAt).toDateString() === new Date().toDateString()).length;
 
       await addDoc(collection(db, "withdrawals"), {
         userId: auth.currentUser.uid,
@@ -62,30 +93,31 @@ export default function Withdraw() {
         createdAt: new Date().toISOString()
       });
 
-      // NOTIFY ADMINS
+      // NOTIFY ADMINS + FRAUD ALERT
       const adminQuery = query(collection(db, "users"), where("role", "==", "admin"));
       const adminSnap = await getDocs(adminQuery);
       const adminNotifs = [];
       adminSnap.forEach((adminDoc) => {
-        adminNotifs.push(
-          addDoc(collection(db, "notifications"), {
+        adminNotifs.push(addDoc(collection(db, "notifications"), {
+          userId: adminDoc.id,
+          message: `💸 Withdrawal request for ${amountToWithdraw / coinRate} ETB from ${auth.currentUser.email}`,
+          type: 'admin_alert', read: false, createdAt: new Date().toISOString()
+        }));
+        
+        // Fraud alert
+        if (userWithdrawalsToday >= 2) {
+          adminNotifs.push(addDoc(collection(db, "notifications"), {
             userId: adminDoc.id,
-            message: `💸 New withdrawal request for ${amountToWithdraw / coinRate} ETB from ${auth.currentUser.email}`,
-            type: 'admin_alert',
-            read: false,
-            createdAt: new Date().toISOString()
-          })
-        );
+            message: `🚨 FRAUD ALERT: ${auth.currentUser.email} has requested ${userWithdrawalsToday + 1} withdrawals today!`,
+            type: 'fraud_alert', read: false, createdAt: new Date().toISOString()
+          }));
+        }
       });
       await Promise.all(adminNotifs);
 
-      toast.success("Withdrawal request submitted! Check history for status.");
-      setBankName('');
-      setAccountNo('');
-      setAmountToWithdraw(100);
-    } catch (error) {
-      toast.error("Error processing withdrawal.");
-    }
+      toast.success("Withdrawal request submitted!");
+      setBankName(''); setAccountNo(''); setAmountToWithdraw(100); setEnteredPin('');
+    } catch (error) { toast.error("Error processing withdrawal."); }
     setLoading(false);
   };
 
@@ -109,6 +141,11 @@ export default function Withdraw() {
           <input type="number" value={amountToWithdraw} onChange={(e) => setAmountToWithdraw(Number(e.target.value))} style={{ width: '100%', padding: '12px', marginTop: '5px', borderRadius: '8px', border: `1px solid ${cardBorder}`, backgroundColor: darkMode ? '#121212' : 'white', color: textColor }} />
           <small style={{ color: '#4caf50', fontWeight: 'bold' }}>You will receive: {amountToWithdraw / coinRate} ETB</small>
         </div>
+
+        <div>
+          <label style={{ fontWeight: 'bold' }}>Security PIN</label>
+          <input type="password" maxLength="4" value={enteredPin} onChange={(e) => setEnteredPin(e.target.value)} placeholder="Enter 4-digit PIN" required style={{ width: '100%', padding: '12px', marginTop: '5px', borderRadius: '8px', border: `1px solid ${cardBorder}`, backgroundColor: darkMode ? '#121212' : 'white', color: textColor }} />
+        </div>
         
         <div>
           <label style={{ fontWeight: 'bold' }}>Bank Name</label>
@@ -117,7 +154,6 @@ export default function Withdraw() {
             <option value="CBE">Commercial Bank of Ethiopia (CBE)</option>
             <option value="Awash">Awash Bank</option>
             <option value="Wegagen">Wegagen Bank</option>
-            <option value="Anbesa">Anbesa Bank</option>
             <option value="Telebirr">TeleBirr</option>
             <option value="M-PESA">M-PESA</option>
           </select>

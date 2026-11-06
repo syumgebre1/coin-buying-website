@@ -1,24 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 export default function LandingPage() {
   const navigate = useNavigate();
   const [openFaq, setOpenFaq] = useState(null);
+  const [showInstall, setShowInstall] = useState(false);
+
+  useEffect(() => {
+    if (window.innerWidth <= 768 && !window.matchMedia('(display-mode: standalone)').matches) {
+      const visits = Number(localStorage.getItem('visitCount') || 0) + 1;
+      localStorage.setItem('visitCount', visits);
+      if (visits >= 2) {
+        const t = setTimeout(() => setShowInstall(true), 3000);
+        return () => clearTimeout(t);
+      }
+    }
+  }, []);
 
   const toggleFaq = (index) => {
     setOpenFaq(openFaq === index ? null : index);
   };
 
   const faqs = [
-    { q: "How do I buy coins?", a: "Sign up, go to the dashboard, select a package or custom amount, and pay via TeleBirr, CBE, or International Card." },
-    { q: "How do I withdraw to ETB?", a: "Go to your profile, click 'Withdraw ETB', enter your bank details, and the Admin will process it." },
-    { q: "Are the casino games fair?", a: "Yes! All games use provably fair standard randomization algorithms (Math.random)." },
+    { q: "How do I buy coins?", a: "Sign up, go to the dashboard, select a package, and pay via TeleBirr or CBE." },
+    { q: "How do I withdraw to ETB?", a: "Go to your profile, click 'Withdraw ETB', enter your bank details and PIN, and the Admin will process it." },
+    { q: "Are the casino games fair?", a: "Yes! All games use provably fair standard randomization algorithms." },
     { q: "What is the minimum withdrawal?", a: "The minimum withdrawal amount is 50 Coins." }
   ];
 
   return (
     <div style={{ color: '#333', backgroundColor: '#f8f9fa', minHeight: '100vh', overflowX: 'hidden' }}>
       
+      {/* INSTALL APP POPUP */}
+      {showInstall && (
+        <div style={{ position: 'fixed', bottom: '20px', left: '20px', right: '20px', backgroundColor: '#1a237e', color: 'white', padding: '15px', borderRadius: '12px', zIndex: 9999, display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' }}>
+          <div>
+            <strong style={{ display: 'block' }}>Install SYUM BET App</strong>
+            <span style={{ fontSize: '12px' }}>Add to home screen for faster access!</span>
+          </div>
+          <button onClick={() => setShowInstall(false)} style={{ background: 'white', color: '#1a237e', border: 'none', padding: '8px 15px', borderRadius: '20px', fontWeight: 'bold', cursor: 'pointer' }}>Got it</button>
+        </div>
+      )}
+
       {/* HERO SECTION */}
       <div style={{ backgroundColor: '#1a237e', color: 'white', padding: '80px 20px', textAlign: 'center', borderBottomLeftRadius: '40px', borderBottomRightRadius: '40px', boxShadow: '0 10px 30px rgba(26,35,126,0.3)' }}>
         <h1 style={{ fontSize: '42px', margin: '0 0 20px 0', fontWeight: '900' }}>The Ultimate Coin Experience.</h1>
@@ -43,14 +66,14 @@ export default function LandingPage() {
 
           <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '15px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
             <div style={{ fontSize: '40px', marginBottom: '15px' }}>🎰</div>
-            <h3 style={{ margin: '0 0 10px 0' }}>6 Casino Games</h3>
-            <p style={{ margin: 0, color: '#666' }}>Bet your coins on Plinko, Slots, Coin Flip, and more to win big.</p>
+            <h3 style={{ margin: '0 0 10px 0' }}>7 Casino Games</h3>
+            <p style={{ margin: 0, color: '#666' }}>Bet your coins on Mines, Plinko, Slots, Coin Flip, and more.</p>
           </div>
 
           <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '15px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
             <div style={{ fontSize: '40px', marginBottom: '15px' }}>🏦</div>
             <h3 style={{ margin: '0 0 10px 0' }}>Instant Withdrawals</h3>
-            <p style={{ margin: 0, color: '#666' }}>Cash out your coins back to your bank account safely and securely.</p>
+            <p style={{ margin: 0, color: '#666' }}>Cash out your coins back to your bank account securely with a PIN.</p>
           </div>
 
         </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { auth, db } from '../firebase';
+import { auth, db } from '../firebaseConfig';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
@@ -7,21 +7,22 @@ import toast from 'react-hot-toast';
 
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
-  const [identifier, setIdentifier] = useState(''); // Can be email or username
+  const [identifier, setIdentifier] = useState(''); 
   const [password, setPassword] = useState('');
-  const [username, setUsername] = useState(''); // For sign up
-  const [email, setEmail] = useState(''); // For sign up
+  const [username, setUsername] = useState(''); 
+  const [email, setEmail] = useState(''); 
   const [showPassword, setShowPassword] = useState(false);
   const [referralCode, setReferralCode] = useState('');
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Wrap everything in try/catch to prevent the black screen crash
     try {
       if (isLogin) {
         let loginEmail = identifier;
 
-        // If the identifier does not include '@', it's a username. Look up the email.
         if (!identifier.includes('@')) {
           const q = query(collection(db, "users"), where("username", "==", identifier.toLowerCase()));
           const snap = await getDocs(q);
@@ -67,9 +68,11 @@ export default function LoginPage() {
           }
         }
 
+        // 1. Create Auth User
         const userCred = await createUserWithEmailAndPassword(auth, email, password);
         await sendEmailVerification(userCred.user);
 
+        // 2. Create Firestore Doc IMMEDIATELY
         const myInviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
         
         await setDoc(doc(db, "users", userCred.user.uid), {
@@ -84,12 +87,17 @@ export default function LoginPage() {
           createdAt: new Date().toISOString()
         });
 
+        // 3. Update Referrer (if applicable)
         if (referrerId) {
-          const referrerRef = doc(db, "users", referrerId);
-          const referrerSnap = await getDoc(referrerRef);
-          if (referrerSnap.exists()) {
-            const currentCoins = referrerSnap.data().coins || 0;
-            await updateDoc(referrerRef, { coins: currentCoins + 50 });
+          try {
+            const referrerRef = doc(db, "users", referrerId);
+            const referrerSnap = await getDoc(referrerRef);
+            if (referrerSnap.exists()) {
+              const currentCoins = referrerSnap.data().coins || 0;
+              await updateDoc(referrerRef, { coins: currentCoins + 50 });
+            }
+          } catch (refErr) {
+             console.error("Referrer update failed, but account created:", refErr);
           }
         }
 
@@ -97,6 +105,7 @@ export default function LoginPage() {
       }
       navigate('/dashboard');
     } catch (err) {
+      console.error("Auth Error:", err);
       toast.error(err.message.replace("Firebase: ", ""));
     }
   };

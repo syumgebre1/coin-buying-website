@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { auth, db } from '../firebase';
+import { auth, db } from '../firebaseConfig';
 import { updatePassword } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';

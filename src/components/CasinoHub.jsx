@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { db, auth } from '../firebase';
+import { db, auth } from '../firebaseConfig';
 import { doc, getDoc, updateDoc, addDoc, collection } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { ThemeContext } from '../ThemeContext';
@@ -37,23 +37,13 @@ export default function CasinoHub() {
       setUserCoins(newBalance);
 
       await addDoc(collection(db, "transactions"), {
-        userId: auth.currentUser.uid,
-        userEmail: auth.currentUser.email,
-        amount: 0,
-        coins: betAmount,
-        method: gameName,
-        status: status,
-        winAmount: winAmount,
-        receiptUrl: '',
-        createdAt: new Date().toISOString()
+        userId: auth.currentUser.uid, userEmail: auth.currentUser.email,
+        amount: 0, coins: betAmount, method: gameName, status: status,
+        winAmount: winAmount, receiptUrl: '', createdAt: new Date().toISOString()
       });
 
-      if (status === 'won' && winAmount > betAmount) {
-        fireConfetti();
-      }
-    } catch (error) {
-      toast.error("Error updating balance.");
-    }
+      if (status === 'won' && winAmount > betAmount) fireConfetti();
+    } catch (error) { toast.error("Error updating balance."); }
   };
 
   if (activeGame === 'coinflip') return <CoinFlip gameBack={() => setActiveGame(null)} userCoins={userCoins} updateBalanceAndLog={updateBalanceAndLog} />;
@@ -62,6 +52,8 @@ export default function CasinoHub() {
   if (activeGame === 'slots') return <SlotMachine gameBack={() => setActiveGame(null)} userCoins={userCoins} updateBalanceAndLog={updateBalanceAndLog} />;
   if (activeGame === 'plinko') return <Plinko gameBack={() => setActiveGame(null)} userCoins={userCoins} updateBalanceAndLog={updateBalanceAndLog} />;
   if (activeGame === 'guess') return <LuckyNumber gameBack={() => setActiveGame(null)} userCoins={userCoins} updateBalanceAndLog={updateBalanceAndLog} />;
+  if (activeGame === 'mines') return <Mines gameBack={() => setActiveGame(null)} userCoins={userCoins} updateBalanceAndLog={updateBalanceAndLog} />;
+  if (activeGame === 'aviator') return <Aviator gameBack={() => setActiveGame(null)} userCoins={userCoins} updateBalanceAndLog={updateBalanceAndLog} />;
 
   return (
     <div style={{ maxWidth: '500px', margin: '0 auto', padding: '20px', color: textColor }}>
@@ -70,15 +62,16 @@ export default function CasinoHub() {
       <div style={{ backgroundColor: '#1a237e', color: 'white', padding: '20px', borderRadius: '12px', marginBottom: '30px', textAlign: 'center' }}>
         <h2 style={{ margin: 0 }}>Casino Hub</h2>
         <p style={{ margin: '10px 0 0 0' }}>Balance: 🪙 {userCoins} Coins</p>
-        <p style={{ margin: '5px 0 0 0', fontSize: '10px', opacity: 0.7 }}>House Edge: 75% | Player Win Chance: 25%</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+        <GameCard title="Aviator" icon="✈️" onClick={() => setActiveGame('aviator')} bg={cardBg} border={cardBorder} text={textColor} />
+        <GameCard title="Mines" icon="💣" onClick={() => setActiveGame('mines')} bg={cardBg} border={cardBorder} text={textColor} />
         <GameCard title="Coin Flip" icon="🪙" onClick={() => setActiveGame('coinflip')} bg={cardBg} border={cardBorder} text={textColor} />
-        <GameCard title="Dice Roller" icon="🎲" onClick={() => setActiveGame('dice')} bg={cardBg} border={cardBorder} text={textColor} />
-        <GameCard title="Spin Wheel" icon="🎡" onClick={() => setActiveGame('wheel')} bg={cardBg} border={cardBorder} text={textColor} />
-        <GameCard title="Slot Machine" icon="🎰" onClick={() => setActiveGame('slots')} bg={cardBg} border={cardBorder} text={textColor} />
         <GameCard title="Plinko Drop" icon="⚪" onClick={() => setActiveGame('plinko')} bg={cardBg} border={cardBorder} text={textColor} />
+        <GameCard title="Slot Machine" icon="🎰" onClick={() => setActiveGame('slots')} bg={cardBg} border={cardBorder} text={textColor} />
+        <GameCard title="Spin Wheel" icon="🎡" onClick={() => setActiveGame('wheel')} bg={cardBg} border={cardBorder} text={textColor} />
+        <GameCard title="Dice Roller" icon="🎲" onClick={() => setActiveGame('dice')} bg={cardBg} border={cardBorder} text={textColor} />
         <GameCard title="Lucky Number" icon="🔢" onClick={() => setActiveGame('guess')} bg={cardBg} border={cardBorder} text={textColor} />
       </div>
     </div>
@@ -94,195 +87,83 @@ function GameCard({ title, icon, onClick, bg, border, text }) {
   );
 }
 
-// --- GAMES ---
-
-function CoinFlip({ gameBack, userCoins, updateBalanceAndLog }) {
+// --- THE AVIATOR GAME ---
+function Aviator({ gameBack, userCoins, updateBalanceAndLog }) {
   const [bet, setBet] = useState(10);
-  const [choice, setChoice] = useState('heads');
-  const [flipping, setFlipping] = useState(false);
-  const [result, setResult] = useState(null);
+  const [multiplier, setMultiplier] = useState(1.00);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [crashed, setCrashed] = useState(false);
+  const [message, setMessage] = useState('');
+  const intervalRef = useRef(null);
 
-  const play = () => {
+  const startGame = () => {
     if (bet > userCoins || bet <= 0) return toast.error("Invalid bet");
-    setFlipping(true); setResult(null);
-    setTimeout(async () => {
-      // 25% win chance
-      const win = Math.random() < 0.25;
-      const outcome = win ? choice : (choice === 'heads' ? 'tails' : 'heads');
-      setResult({ win, outcome });
-      await updateBalanceAndLog(bet, win ? bet * 2 : 0, "Coin Flip", win ? "won" : "lost");
-      setFlipping(false);
-    }, 1000);
-  };
+    setIsPlaying(true);
+    setCrashed(false);
+    setMultiplier(1.00);
+    setMessage('');
 
-  return (
-    <GameLayout title="Coin Flip" gameBack={gameBack} userCoins={userCoins}>
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-        <button onClick={() => setChoice('heads')} style={{ flex: 1, padding: '15px', borderRadius: '8px', border: choice === 'heads' ? '2px solid #1a237e' : '1px solid #ccc', fontWeight: 'bold' }}>Heads</button>
-        <button onClick={() => setChoice('tails')} style={{ flex: 1, padding: '15px', borderRadius: '8px', border: choice === 'tails' ? '2px solid #1a237e' : '1px solid #ccc', fontWeight: 'bold' }}>Tails</button>
-      </div>
-      <input type="number" value={bet} onChange={e => setBet(Number(e.target.value))} style={{ width: '100%', padding: '12px', marginBottom: '20px', borderRadius: '8px', border: '1px solid #ccc' }} />
-      <button onClick={play} disabled={flipping} style={{ width: '100%', padding: '15px', backgroundColor: '#f57c00', color: 'white', fontWeight: 'bold', border: 'none', borderRadius: '8px' }}>{flipping ? 'Flipping...' : 'Flip!'}</button>
-      {result && <h3 style={{ textAlign: 'center', marginTop: '20px', color: result.win ? '#4caf50' : '#d32f2f' }}>{result.win ? `Won! It was ${result.outcome}` : `Lost. It was ${result.outcome}`}</h3>}
-    </GameLayout>
-  );
-}
-
-function DiceRoller({ gameBack, userCoins, updateBalanceAndLog }) {
-  const [bet, setBet] = useState(10);
-  const [choice, setChoice] = useState('high'); 
-  const [rolling, setRolling] = useState(false);
-  const [result, setResult] = useState(null);
-
-  const play = () => {
-    if (bet > userCoins || bet <= 0) return toast.error("Invalid bet");
-    setRolling(true); setResult(null);
-    setTimeout(async () => {
-      const roll = Math.floor(Math.random() * 100) + 1;
-      // 25% win chance. High must be > 75, Low must be < 25.
-      const win = (choice === 'high' && roll > 75) || (choice === 'low' && roll <= 25);
-      setResult({ win, roll });
-      await updateBalanceAndLog(bet, win ? bet * 3 : 0, "Dice Roller", win ? "won" : "lost"); // Payout increased to 3x for the higher risk
-      setRolling(false);
-    }, 1000);
-  };
-
-  return (
-    <GameLayout title="Dice Roller" gameBack={gameBack} userCoins={userCoins}>
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-        <button onClick={() => setChoice('low')} style={{ flex: 1, padding: '15px', borderRadius: '8px', border: choice === 'low' ? '2px solid #1a237e' : '1px solid #ccc', fontWeight: 'bold' }}>Low (1-25)</button>
-        <button onClick={() => setChoice('high')} style={{ flex: 1, padding: '15px', borderRadius: '8px', border: choice === 'high' ? '2px solid #1a237e' : '1px solid #ccc', fontWeight: 'bold' }}>High (76-100)</button>
-      </div>
-      <input type="number" value={bet} onChange={e => setBet(Number(e.target.value))} style={{ width: '100%', padding: '12px', marginBottom: '20px', borderRadius: '8px', border: '1px solid #ccc' }} />
-      <button onClick={play} disabled={rolling} style={{ width: '100%', padding: '15px', backgroundColor: '#f57c00', color: 'white', fontWeight: 'bold', border: 'none', borderRadius: '8px' }}>{rolling ? 'Rolling...' : 'Roll Dice!'}</button>
-      {result && <h3 style={{ textAlign: 'center', marginTop: '20px', color: result.win ? '#4caf50' : '#d32f2f' }}>Rolled {result.roll}! {result.win ? 'You Won!' : 'You Lost'}</h3>}
-    </GameLayout>
-  );
-}
-
-function SpinWheel({ gameBack, userCoins, updateBalanceAndLog }) {
-  const [bet, setBet] = useState(10);
-  const [spinning, setSpinning] = useState(false);
-  const [result, setResult] = useState(null);
-
-  const play = () => {
-    if (bet > userCoins || bet <= 0) return toast.error("Invalid bet");
-    setSpinning(true); setResult(null);
-    setTimeout(async () => {
-      const rand = Math.random();
-      let multiplier = 0;
-      // 25% win chance
-      if (rand < 0.10) multiplier = 3;      // 10% chance for 3x
-      else if (rand < 0.25) multiplier = 2; // 15% chance for 2x
-      else multiplier = 0;                  // 75% chance to lose
-
-      const win = multiplier > 0;
-      setResult({ multiplier });
-      await updateBalanceAndLog(bet, win ? bet * multiplier : 0, "Spin Wheel", win ? "won" : "lost");
-      setSpinning(false);
-    }, 1500);
-  };
-
-  return (
-    <GameLayout title="Spin Wheel" gameBack={gameBack} userCoins={userCoins}>
-      <p style={{ textAlign: 'center', color: '#666' }}>25% Win Chance!</p>
-      <input type="number" value={bet} onChange={e => setBet(Number(e.target.value))} style={{ width: '100%', padding: '12px', marginBottom: '20px', borderRadius: '8px', border: '1px solid #ccc' }} />
-      <button onClick={play} disabled={spinning} style={{ width: '100%', padding: '15px', backgroundColor: '#f57c00', color: 'white', fontWeight: 'bold', border: 'none', borderRadius: '8px' }}>{spinning ? 'Spinning...' : 'Spin!'}</button>
-      {result && <h3 style={{ textAlign: 'center', marginTop: '20px', color: result.multiplier > 0 ? '#4caf50' : '#d32f2f' }}>{result.multiplier > 0 ? `You Won ${result.multiplier}x!` : 'You Lost'}</h3>}
-    </GameLayout>
-  );
-}
-
-function SlotMachine({ gameBack, userCoins, updateBalanceAndLog }) {
-  const [bet, setBet] = useState(10);
-  const [spinning, setSpinning] = useState(false);
-  const [reels, setReels] = useState(['🍒', '🍋', '🔔']);
-  
-  const emojis = ['🍒', '🍋', '🔔', '💎'];
-
-  const play = () => {
-    if (bet > userCoins || bet <= 0) return toast.error("Invalid bet");
-    setSpinning(true);
-    const interval = setInterval(() => {
-      setReels([emojis[Math.floor(Math.random()*4)], emojis[Math.floor(Math.random()*4)], emojis[Math.floor(Math.random()*4)]]);
+    // Crash point is calculated with house edge (approx 5% instant crash, max 10x)
+    const crashPoint = (Math.random() < 0.05) ? 1.00 : (Math.random() * 8 + 1.2).toFixed(2);
+    
+    intervalRef.current = setInterval(() => {
+      setMultiplier(prev => {
+        const newMult = prev + 0.05;
+        if (newMult >= Number(crashPoint)) {
+          clearInterval(intervalRef.current);
+          setIsPlaying(false);
+          setCrashed(true);
+          setMessage(`Crashed at ${crashPoint}x! You lost.`);
+          updateBalanceAndLog(bet, 0, "Aviator", "lost");
+          return Number(crashPoint);
+        }
+        return newMult;
+      });
     }, 100);
-
-    setTimeout(async () => {
-      clearInterval(interval);
-      
-      const rand = Math.random();
-      let finalReels;
-      
-      // Rig the result to only win 25% of the time
-      if (rand < 0.05) {
-        // 5% chance Jackpot
-        finalReels = ['💎', '💎', '💎'];
-      } else if (rand < 0.15) {
-        // 10% chance Triple Match
-        const e = emojis[Math.floor(Math.random()*3)];
-        finalReels = [e, e, e];
-      } else if (rand < 0.25) {
-        // 10% chance Double Match
-        const e = emojis[Math.floor(Math.random()*4)];
-        finalReels = [e, e, emojis[Math.floor(Math.random()*4)]];
-      } else {
-        // 75% chance No Match
-        finalReels = [emojis[0], emojis[1], emojis[2]]; // Guaranteed no match
-      }
-      
-      setReels(finalReels);
-
-      let winAmount = 0;
-      if (finalReels[0] === '💎' && finalReels[1] === '💎' && finalReels[2] === '💎') winAmount = bet * 15;
-      else if (finalReels[0] === finalReels[1] && finalReels[1] === finalReels[2]) winAmount = bet * 3;
-      else if (finalReels[0] === finalReels[1] || finalReels[1] === finalReels[2] || finalReels[0] === finalReels[2]) winAmount = bet * 1.5;
-
-      await updateBalanceAndLog(bet, winAmount, "Slot Machine", winAmount > 0 ? "won" : "lost");
-      setSpinning(false);
-      if (winAmount > 0) toast.success(`You won ${winAmount} coins!`);
-      else toast.error("No match, you lost!");
-    }, 2000);
   };
 
-  return (
-    <GameLayout title="Slot Machine" gameBack={gameBack} userCoins={userCoins}>
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', fontSize: '50px', marginBottom: '30px', backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '12px' }}>
-        {reels.map((r, i) => <span key={i}>{r}</span>)}
-      </div>
-      <input type="number" value={bet} onChange={e => setBet(Number(e.target.value))} style={{ width: '100%', padding: '12px', marginBottom: '20px', borderRadius: '8px', border: '1px solid #ccc' }} />
-      <button onClick={play} disabled={spinning} style={{ width: '100%', padding: '15px', backgroundColor: '#f57c00', color: 'white', fontWeight: 'bold', border: 'none', borderRadius: '8px' }}>{spinning ? 'Spinning...' : 'Spin Slots!'}</button>
-    </GameLayout>
-  );
-}
-
-function Plinko({ gameBack, userCoins, updateBalanceAndLog }) {
-  const [bet, setBet] = useState(10);
-  const [dropping, setDropping] = useState(false);
-  const [result, setResult] = useState(null);
-
-  // Multipliers heavily skewed so middle (0.2x) is most common
-  const multipliers = [4, 2, 1, 0.5, 0.2, 0.5, 1, 2, 4];
-
-  const play = () => {
-    if (bet > userCoins || bet <= 0) return toast.error("Invalid bet");
-    setDropping(true); setResult(null);
-    setTimeout(async () => {
-      // Using normal distribution math, the middle is hit ~75% of the time
-      const rand = Math.random() + Math.random() + Math.random();
-      const index = Math.floor((rand / 3) * multipliers.length);
-      const mult = multipliers[index];
-      
-      const winAmount = bet * mult;
-      setResult(mult);
-      await updateBalanceAndLog(bet, winAmount, "Plinko Drop", winAmount >= bet ? "won" : "lost");
-      setDropping(false);
-    }, 2000);
+  const cashOut = () => {
+    if (!isPlaying) return;
+    clearInterval(intervalRef.current);
+    setIsPlaying(false);
+    const winAmount = Math.floor(bet * multiplier);
+    setMessage(`Cashed out at ${multiplier.toFixed(2)}x! Won ${winAmount} coins!`);
+    updateBalanceAndLog(bet, winAmount, "Aviator", "won");
   };
 
+  useEffect(() => {
+    return () => clearInterval(intervalRef.current);
+  }, []);
+
   return (
-    <GameLayout title="Plinko Drop" gameBack={gameBack} userCoins={userCoins}>
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px', opacity: dropping ? 0.5 : 1 }}>
-        <div style={{ width: '20px', height: '20px', borderRadius: '50%', backgroundColor: '#d32f2f' }}></div>
+    <GameLayout title="Aviator ✈️" gameBack={gameBack} userCoins={userCoins}>
+      <div style={{ backgroundColor: '#1e293b', padding: '0', borderRadius: '12px', marginBottom: '20px', position: 'relative', overflow: 'hidden', height: '250px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        
+        {/* Background Grid */}
+        <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '100%', backgroundImage: 'linear-gradient(#2a3441 1px, transparent 1px), linear-gradient(90deg, #2a3441 1px, transparent 1px)', backgroundSize: '20px 20px', opacity: 0.3 }}></div>
+
+        {/* The Flying Plane (Curved Path) */}
+        <div style={{
+          position: 'absolute',
+          bottom: `${Math.min((multiplier - 1) * 12, 80)}%`, 
+          left: `${Math.min(Math.pow(multiplier - 1, 1.5) * 15, 80)}%`,
+          fontSize: '40px',
+          transition: 'all 0.1s linear',
+          transform: crashed ? 'rotate(90deg) translateY(-20px)' : 'none',
+          opacity: crashed ? 0 : 1,
+          zIndex: 5
+        }}>
+          ✈️
+        </div>
+
+        {/* Text Overlay */}
+        <div style={{ zIndex: 10, textAlign: 'center' }}>
+          <h1 style={{ margin: 0, fontSize: '60px', color: crashed ? '#ef4444' : (isPlaying ? '#4caf50' : 'white'), transition: 'color 0.3s', textShadow: '0px 4px 10px rgba(0,0,0,0.8)' }}>
+            {multiplier.toFixed(2)}x
+          </h1>
+          {isPlaying && <p style={{ color: '#4caf50', margin: '10px 0 0 0', fontWeight: 'bold' }}>Flying...</p>}
+          {crashed && <p style={{ color: '#ef4444', margin: '10px 0 0 0', fontWeight: 'bold', fontSize: '20px' }}>FLEW AWAY!</p>}
+        </div>
       </div>
       <input type="number" value={bet} onChange={e => setBet(Number(e.target.value))} style={{ width: '100%', padding: '12px', marginBottom: '20px', borderRadius: '8px', border: '1px solid #ccc' }} />
       <button onClick={play} disabled={dropping} style={{ width: '100%', padding: '15px', backgroundColor: '#f57c00', color: 'white', fontWeight: 'bold', border: 'none', borderRadius: '8px' }}>{dropping ? 'Dropping...' : 'Drop Ball!'}</button>
@@ -316,6 +197,90 @@ function LuckyNumber({ gameBack, userCoins, updateBalanceAndLog }) {
       <input type="number" value={bet} onChange={e => setBet(Number(e.target.value))} style={{ width: '100%', padding: '12px', marginBottom: '20px', borderRadius: '8px', border: '1px solid #ccc' }} />
       <button onClick={play} disabled={rolling} style={{ width: '100%', padding: '15px', backgroundColor: '#f57c00', color: 'white', fontWeight: 'bold', border: 'none', borderRadius: '8px' }}>{rolling ? 'Rolling...' : 'Try Your Luck!'}</button>
       {result && <h3 style={{ textAlign: 'center', marginTop: '20px', color: result.win ? '#4caf50' : '#d32f2f' }}>Result: {result.number}. {result.win ? 'JACKPOT!' : 'Try again'}</h3>}
+    </GameLayout>
+  );
+}
+
+function Mines({ gameBack, userCoins, updateBalanceAndLog }) {
+  const [bet, setBet] = useState(10);
+  const [mineCount, setMineCount] = useState(3);
+  const [grid, setGrid] = useState([]);
+  const [revealed, setRevealed] = useState([]);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [gameOver, setGameOver] = useState(false);
+  const [multiplier, setMultiplier] = useState(1);
+
+  const startGame = () => {
+    if (bet > userCoins || bet <= 0) return toast.error("Invalid bet");
+    const newGrid = Array(25).fill('diamond');
+    let minesPlaced = 0;
+    while (minesPlaced < mineCount) {
+      const idx = Math.floor(Math.random() * 25);
+      if (newGrid[idx] !== 'mine') { newGrid[idx] = 'mine'; minesPlaced++; }
+    }
+    setGrid(newGrid); setRevealed([]); setIsPlaying(true); setGameOver(false); setMultiplier(1);
+  };
+
+  const revealCell = (index) => {
+    if (!isPlaying || revealed.includes(index)) return;
+    const newRevealed = [...revealed, index];
+    setRevealed(newRevealed);
+
+    if (grid[index] === 'mine') {
+      setIsPlaying(false); setGameOver(true);
+      setRevealed(grid.map((_, i) => i)); 
+      updateBalanceAndLog(bet, 0, "Mines", "lost");
+      toast.error("BOOM! You hit a mine.");
+    } else {
+      const safeRevealed = newRevealed.length;
+      const newMultiplier = (1 + (safeRevealed * (mineCount / (25 - safeRevealed)))).toFixed(2);
+      setMultiplier(Number(newMultiplier));
+      if (safeRevealed === 25 - mineCount) cashOut(newMultiplier);
+    }
+  };
+
+  const cashOut = async (currentMultiplier) => {
+    const winAmount = Math.floor(bet * currentMultiplier);
+    setIsPlaying(false);
+    await updateBalanceAndLog(bet, winAmount, "Mines", "won");
+    toast.success(`Cashed out ${winAmount} Coins!`);
+  };
+
+  return (
+    <GameLayout title="Mines 💣" gameBack={gameBack} userCoins={userCoins}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
+        <div>
+          <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Bet</label>
+          <input type="number" value={bet} onChange={e => setBet(Number(e.target.value))} disabled={isPlaying} style={{ width: '80px', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }} />
+        </div>
+        <div>
+          <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Mines</label>
+          <select value={mineCount} onChange={e => setMineCount(Number(e.target.value))} disabled={isPlaying} style={{ width: '80px', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}>
+            {[1, 3, 5, 10, 24].map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Multiplier</label>
+          <h3 style={{ margin: 0, color: '#4caf50' }}>{multiplier}x</h3>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px', marginBottom: '20px' }}>
+        {Array(25).fill(0).map((_, i) => {
+          const isRevealed = revealed.includes(i);
+          const isMine = grid[i] === 'mine';
+          return (
+            <button key={i} onClick={() => revealCell(i)} disabled={!isPlaying || isRevealed}
+              style={{ height: '50px', borderRadius: '8px', border: 'none', backgroundColor: isRevealed ? (isMine ? '#d32f2f' : '#4caf50') : (isPlaying ? '#1a237e' : '#e0e0e0'), color: 'white', fontSize: '20px', cursor: (isPlaying && !isRevealed) ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {isRevealed ? (isMine ? '💣' : '💎') : ''}
+            </button>
+          );
+        })}
+      </div>
+
+      {!isPlaying && !gameOver && <button onClick={startGame} style={{ width: '100%', padding: '15px', backgroundColor: '#f57c00', color: 'white', fontWeight: 'bold', border: 'none', borderRadius: '8px' }}>Start Game</button>}
+      {isPlaying && <button onClick={() => cashOut(multiplier)} style={{ width: '100%', padding: '15px', backgroundColor: '#4caf50', color: 'white', fontWeight: 'bold', border: 'none', borderRadius: '8px' }}>Cash Out ({Math.floor(bet * multiplier)} Coins)</button>}
+      {gameOver && <button onClick={startGame} style={{ width: '100%', padding: '15px', backgroundColor: '#d32f2f', color: 'white', fontWeight: 'bold', border: 'none', borderRadius: '8px' }}>Play Again</button>}
     </GameLayout>
   );
 }

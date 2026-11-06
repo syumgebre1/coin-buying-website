@@ -3,12 +3,13 @@ import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAN_XcDH_YhXI3PN_FYZ6LvRGntHDeDE2k",
+  apiKey: "AIzaSyCK5kfyHhrbywpbLbGzDhjjYgd7qakBJQc",
   authDomain: "coin-buying-website.firebaseapp.com",
   projectId: "coin-buying-website",
   storageBucket: "coin-buying-website.firebasestorage.app",
-  messagingSenderId: "881810560595", 
-  appId: "1:881810560595:web:8d9714f76c1e542a3b0fa6" 
+  messagingSenderId: "511864697105",
+  appId: "1:511864697105:web:a19811391c4484e4de5cb0",
+  measurementId: "G-005MP9B7YF"
 };
 
 const app = initializeApp(firebaseConfig);

@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { db, auth } from '../firebase';
+import { db, auth } from '../firebaseConfig';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { ThemeContext } from '../ThemeContext';
+import { jsPDF } from "jspdf";
+import QRCode from "qrcode";
 import toast from 'react-hot-toast';
 import SupportChat from './SupportChat';
 
@@ -12,12 +14,11 @@ export default function UserProfile() {
   const [profile, setProfile] = useState(null);
   const [stats, setStats] = useState({ totalBets: 0, wins: 0, losses: 0 });
   const [withdrawals, setWithdrawals] = useState([]);
+  const [transactions, setTransactions] = useState([]);
   const [showChat, setShowChat] = useState(false);
-  
-  // Username Edit State
   const [newUsername, setNewUsername] = useState('');
+  const [pin, setPin] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
-  
   const { darkMode } = useContext(ThemeContext);
 
   useEffect(() => {
@@ -28,11 +29,13 @@ export default function UserProfile() {
         const data = userDoc.data();
         setProfile(data);
         setNewUsername(data.username || '');
+        setPin(data.withdrawPin || '');
       }
 
       const q = query(collection(db, "transactions"), where("userId", "==", auth.currentUser.uid));
       const snapshot = await getDocs(q);
       const txs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setTransactions(txs);
       
       const bets = txs.filter(t => t.amount === 0);
       const wins = bets.filter(t => t.status === 'won').length;
@@ -49,47 +52,119 @@ export default function UserProfile() {
 
   const handleUpdateUsername = async () => {
     if (!newUsername.trim()) return toast.error("Username cannot be empty.");
-    if (newUsername === profile.username) return toast.success("Username is already up to date.");
-    
     setIsUpdating(true);
     try {
-      // Check if new username is taken
       const q = query(collection(db, "users"), where("username", "==", newUsername.toLowerCase()));
       const snap = await getDocs(q);
-      
-      // If it exists and it's not the current user's document
       if (!snap.empty && snap.docs[0].id !== auth.currentUser.uid) {
+        setIsUpdating(false);
         return toast.error("This username is already taken.");
       }
-
-      // Update username
       await updateDoc(doc(db, "users", auth.currentUser.uid), { username: newUsername.toLowerCase() });
       setProfile({ ...profile, username: newUsername.toLowerCase() });
       toast.success("Username updated successfully!");
-    } catch (e) {
-      toast.error("Error updating username.");
-    }
+    } catch (e) { toast.error("Error updating username."); }
     setIsUpdating(false);
   };
 
-  const handlePasswordReset = async () => {
+  const handleUpdatePin = async () => {
+    if (pin.length !== 4 || isNaN(pin)) return toast.error("PIN must be exactly 4 digits.");
+    setIsUpdating(true);
     try {
-      await sendPasswordResetEmail(auth, auth.currentUser.email);
-      toast.success("Password reset link sent to your email!");
-    } catch (error) {
-      toast.error("Error sending reset email.");
-    }
+      await updateDoc(doc(db, "users", auth.currentUser.uid), { withdrawPin: pin });
+      setProfile({ ...profile, withdrawPin: pin });
+      toast.success("Withdrawal PIN updated securely!");
+    } catch (e) { toast.error("Error updating PIN."); }
+    setIsUpdating(false);
   };
 
-  const shareReferral = () => {
-    if (!profile?.inviteCode) return;
-    const text = `Join me on SYUM BET and we both get bonuses! Use my code: ${profile.inviteCode}`;
-    if (navigator.share) {
-      navigator.share({ title: 'SYUM BET', text: text, url: window.location.origin });
-    } else {
-      navigator.clipboard.writeText(text);
-      toast.success("Referral message copied to clipboard!");
-    }
+  const generateStatement = async () => {
+    const doc = new jsPDF();
+    
+    // Dark Navy Header
+    doc.setFillColor(26, 35, 126);
+    doc.rect(0, 0, 210, 45, 'F');
+    
+    // Gold Accent Line
+    doc.setFillColor(212, 175, 55);
+    doc.rect(0, 45, 210, 3, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(26);
+    doc.text("SYUM BET", 105, 20, { align: "center" });
+    
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    doc.text("OFFICIAL ACCOUNT STATEMENT", 105, 32, { align: "center" });
+
+    // User Details
+    doc.setTextColor(50, 50, 50);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Account Holder:", 20, 65);
+    doc.setFont("helvetica", "normal");
+    doc.text(`@${profile.username || 'User'}`, 60, 65);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Current Balance:", 20, 75);
+    doc.setTextColor(212, 175, 55);
+    doc.text(`${profile.coins} Coins`, 60, 75);
+
+    doc.setTextColor(50, 50, 50);
+    doc.setFont("helvetica", "bold");
+    doc.text("Generated On:", 20, 85);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${new Date().toLocaleString()}`, 60, 85);
+
+    // Table Header
+    doc.setFillColor(240, 240, 240);
+    doc.rect(20, 100, 170, 10, 'F');
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "bold");
+    doc.text("Date", 22, 107);
+    doc.text("Description", 60, 107);
+    doc.text("Coins", 130, 107);
+    doc.text("Status", 160, 107);
+
+    // Table Rows
+    doc.setFont("helvetica", "normal");
+    let y = 120;
+    transactions.slice(0, 15).forEach((tx) => {
+      if (y > 250) { doc.addPage(); y = 20; }
+      const date = new Date(tx.createdAt).toLocaleDateString();
+      const type = tx.amount > 0 ? `Deposit (${tx.amount} ETB)` : tx.method;
+      
+      doc.text(date, 22, y);
+      doc.text(type, 60, y);
+      doc.text(`${tx.coins}`, 130, y);
+      
+      if (tx.status === 'completed') doc.setTextColor(46, 125, 50);
+      else if (tx.status === 'pending') doc.setTextColor(245, 124, 0);
+      else doc.setTextColor(198, 40, 40);
+      
+      doc.text(tx.status.toUpperCase(), 160, y);
+      doc.setTextColor(0, 0, 0);
+      y += 10;
+    });
+
+    // URL-based QR Code
+    const baseUrl = "https://coin-buying-website.web.app/verify-statement";
+    const qrUrl = `${baseUrl}?user=${profile.username}&balance=${profile.coins}&app=SYUM BET`;
+    const qrDataUrl = await QRCode.toDataURL(qrUrl, { margin: 1, width: 150 });
+    
+    doc.addImage(qrDataUrl, 'PNG', 150, 220, 40, 40);
+    
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text("Scan to verify authenticity", 150, 265);
+
+    // Footer
+    doc.setFontSize(10);
+    doc.text("Thank you for using SYUM BET. Play responsibly.", 20, 285);
+
+    doc.save(`SYUM_BET_Statement_${profile.username}.pdf`);
+    toast.success("Statement downloaded!");
   };
 
   const cardBg = darkMode ? '#1e1e1e' : 'white';
@@ -99,7 +174,6 @@ export default function UserProfile() {
 
   if (!profile) return <div style={{ textAlign: 'center', marginTop: '50px' }}>Loading profile...</div>;
 
-  const joinDate = new Date(profile.createdAt).toLocaleDateString();
   const winRate = stats.totalBets === 0 ? 0 : Math.round((stats.wins / stats.totalBets) * 100);
 
   return (
@@ -107,17 +181,11 @@ export default function UserProfile() {
       <button onClick={() => navigate('/dashboard')} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', marginBottom: '20px', color: textColor }}>← Back</button>
       
       <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-        <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: profile.isBanned ? '#d32f2f' : '#1a237e', color: 'white', fontSize: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 15px' }}>
+        <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#1a237e', color: 'white', fontSize: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 15px' }}>
           {profile.username ? profile.username.charAt(0).toUpperCase() : profile.email.charAt(0).toUpperCase()}
         </div>
         <h2>@{profile.username || profile.email.split('@')[0]}</h2>
         <p style={{ color: '#666', margin: '5px 0' }}>{profile.email}</p>
-        <p style={{ color: '#666', margin: '5px 0', fontSize: '12px' }}>Joined: {joinDate}</p>
-        
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '10px' }}>
-          {profile.role === 'admin' && <span style={{ backgroundColor: '#ffcdd2', color: '#b71c1c', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>ADMIN</span>}
-          {profile.streak > 0 && <span style={{ backgroundColor: '#ffe0b2', color: '#e65100', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>🔥 {profile.streak} Day Streak</span>}
-        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
@@ -131,48 +199,36 @@ export default function UserProfile() {
         </div>
       </div>
 
-      {/* NEW: Account Settings with Username Edit */}
       <div style={{ backgroundColor: cardBg, border: `1px solid ${cardBorder}`, padding: '20px', borderRadius: '12px', marginBottom: '20px' }}>
         <h3 style={{ margin: '0 0 15px 0' }}>⚙️ Account Settings</h3>
         
         <div style={{ marginBottom: '15px' }}>
           <label style={{ fontWeight: 'bold', fontSize: '14px', display: 'block', marginBottom: '5px' }}>Edit Username</label>
           <div style={{ display: 'flex', gap: '10px' }}>
-            <input 
-              type="text" 
-              value={newUsername} 
-              onChange={(e) => setNewUsername(e.target.value)} 
-              placeholder="Enter new username"
-              style={{ flex: 1, padding: '10px', borderRadius: '6px', border: `1px solid ${cardBorder}`, backgroundColor: inputBg, color: textColor }} 
-            />
-            <button 
-              onClick={handleUpdateUsername} 
-              disabled={isUpdating}
-              style={{ padding: '10px 20px', backgroundColor: isUpdating ? '#9e9e9e' : '#1a237e', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: isUpdating ? 'not-allowed' : 'pointer' }}
-            >
-              {isUpdating ? 'Saving...' : 'Save'}
-            </button>
+            <input type="text" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '6px', border: `1px solid ${cardBorder}`, backgroundColor: inputBg, color: textColor }} />
+            <button onClick={handleUpdateUsername} disabled={isUpdating} style={{ padding: '10px 20px', backgroundColor: '#1a237e', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>Save</button>
           </div>
         </div>
 
-        <button onClick={handlePasswordReset} style={{ width: '100%', padding: '12px', backgroundColor: 'transparent', color: '#d32f2f', border: '1px solid #d32f2f', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ fontWeight: 'bold', fontSize: '14px', display: 'block', marginBottom: '5px' }}>Withdrawal PIN (4 digits)</label>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <input type="password" maxLength="4" value={pin} onChange={(e) => setPin(e.target.value)} placeholder={profile.withdrawPin ? "••••" : "Set a PIN"} style={{ flex: 1, padding: '10px', borderRadius: '6px', border: `1px solid ${cardBorder}`, backgroundColor: inputBg, color: textColor }} />
+            <button onClick={handleUpdatePin} disabled={isUpdating} style={{ padding: '10px 20px', backgroundColor: '#4caf50', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>Save</button>
+          </div>
+        </div>
+
+        <button onClick={generateStatement} style={{ width: '100%', padding: '12px', backgroundColor: '#f57c00', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '10px' }}>
+          📄 Download Bank Statement
+        </button>
+        <button onClick={() => sendPasswordResetEmail(auth, auth.currentUser.email).then(() => toast.success("Reset link sent!"))} style={{ width: '100%', padding: '12px', backgroundColor: 'transparent', color: '#d32f2f', border: '1px solid #d32f2f', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>
           🔑 Change Password
         </button>
-      </div>
-
-      <div style={{ backgroundColor: cardBg, border: `1px solid ${cardBorder}`, padding: '20px', borderRadius: '12px', marginBottom: '20px' }}>
-        <h3 style={{ margin: '0 0 15px 0' }}>🏅 Achievements</h3>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          {profile.coins >= 1000 && <div style={{ backgroundColor: darkMode ? '#2a2a2a' : '#f5f5f5', padding: '10px', borderRadius: '8px', textAlign: 'center', flex: '1 1 30%', border: `1px solid ${cardBorder}` }}><div style={{ fontSize: '24px' }}>💎</div><div style={{ fontSize: '10px', fontWeight: 'bold', color: textColor, marginTop: '5px' }}>High Roller</div></div>}
-          {stats.wins >= 10 && <div style={{ backgroundColor: darkMode ? '#2a2a2a' : '#f5f5f5', padding: '10px', borderRadius: '8px', textAlign: 'center', flex: '1 1 30%', border: `1px solid ${cardBorder}` }}><div style={{ fontSize: '24px' }}>🔥</div><div style={{ fontSize: '10px', fontWeight: 'bold', color: textColor, marginTop: '5px' }}>Hot Streak</div></div>}
-          {profile.streak >= 7 && <div style={{ backgroundColor: darkMode ? '#2a2a2a' : '#f5f5f5', padding: '10px', borderRadius: '8px', textAlign: 'center', flex: '1 1 30%', border: `1px solid ${cardBorder}` }}><div style={{ fontSize: '24px' }}>📅</div><div style={{ fontSize: '10px', fontWeight: 'bold', color: textColor, marginTop: '5px' }}>Dedicated</div></div>}
-        </div>
       </div>
 
       <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
         <button onClick={() => navigate('/withdraw')} style={{ flex: 1, padding: '15px', backgroundColor: '#d32f2f', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>💸 Withdraw</button>
         <button onClick={() => setShowChat(!showChat)} style={{ flex: 1, padding: '15px', backgroundColor: '#4caf50', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>💬 Support</button>
-        <button onClick={shareReferral} style={{ flex: 1, padding: '15px', backgroundColor: '#f57c00', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>🎁 Share</button>
       </div>
 
       {showChat && <SupportChat onClose={() => setShowChat(false)} />}

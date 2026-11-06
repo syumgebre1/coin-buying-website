@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { jsPDF } from "jspdf";
 import QRCode from "qrcode"; 
-import { auth } from '../firebase';
+import { auth } from '../firebaseConfig';
 import toast from 'react-hot-toast';
 
 export default function OrderConfirmation() {
