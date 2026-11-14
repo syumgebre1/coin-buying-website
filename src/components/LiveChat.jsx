@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../firebaseConfig';
-import { collection, addDoc, query, orderBy, limit, onSnapshot, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, query, orderBy, limit, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { ThemeContext } from '../ThemeContext';
 import toast from 'react-hot-toast';
 
@@ -10,20 +10,36 @@ export default function LiveChat() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [myUsername, setMyUsername] = useState('');
+  const [loading, setLoading] = useState(true);
   const { darkMode } = useContext(ThemeContext);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
     const fetchMyName = async () => {
-      const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
-      if (userDoc.exists()) setMyUsername(userDoc.data().username || auth.currentUser.email.split('@')[0]);
+      if (!auth.currentUser) return;
+      try {
+        const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+        if (userDoc.exists()) {
+          setMyUsername(userDoc.data().username || auth.currentUser.email.split('@')[0]);
+        } else {
+          setMyUsername(auth.currentUser.email.split('@')[0]);
+        }
+      } catch (err) {
+        setMyUsername("User");
+      }
     };
     fetchMyName();
 
+    // Listen to the last 50 messages safely
     const q = query(collection(db, "global_chat"), orderBy("createdAt", "asc"), limit(50));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoading(false);
+    }, (error) => {
+      console.error("Error loading chat:", error);
+      setLoading(false);
     });
+
     return () => unsubscribe();
   }, []);
 
@@ -33,38 +49,23 @@ export default function LiveChat() {
 
   const sendMessage = async (e) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || !auth.currentUser) return;
+
+    const messageText = newMessage;
+    setNewMessage(''); // Clear input immediately
 
     try {
+      // Just save the message. No notification loops!
       await addDoc(collection(db, "global_chat"), {
-        text: newMessage,
+        text: messageText,
         userId: auth.currentUser.uid,
         username: myUsername,
         createdAt: new Date().toISOString()
       });
-
-      // Notify everyone EXCEPT the sender
-      const usersSnapshot = await getDocs(collection(db, "users"));
-      const notificationPromises = [];
-      
-      usersSnapshot.forEach((userDoc) => {
-        if (userDoc.id !== auth.currentUser.uid) {
-          notificationPromises.push(
-            addDoc(collection(db, "notifications"), {
-              userId: userDoc.id,
-              message: `💬 New message in Lobby from ${myUsername}: "${newMessage}"`,
-              type: 'lobby',
-              read: false,
-              createdAt: new Date().toISOString()
-            })
-          );
-        }
-      });
-      
-      await Promise.all(notificationPromises);
-      setNewMessage('');
     } catch (error) {
-        toast.error("Failed to send message.");
+      console.error("Chat Error:", error);
+      toast.error("Failed to send message.");
+      setNewMessage(messageText); // Put the text back so they don't lose it
     }
   };
 
@@ -81,19 +82,25 @@ export default function LiveChat() {
       </div>
 
       <div style={{ flex: 1, backgroundColor: bg, border: `1px solid ${border}`, borderRadius: '8px', padding: '15px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {messages.map((msg) => {
-          const isMe = msg.userId === auth.currentUser.uid;
-          return (
-            <div key={msg.id} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
-              <div style={{ fontSize: '10px', color: '#888', marginBottom: '2px', textAlign: isMe ? 'right' : 'left' }}>
-                {isMe ? 'You' : (msg.username || msg.userEmail?.split('@')[0])}
+        {loading ? (
+          <div style={{ textAlign: 'center', marginTop: '20px', color: '#888' }}>Loading messages...</div>
+        ) : messages.length === 0 ? (
+          <div style={{ textAlign: 'center', marginTop: '20px', color: '#888' }}>No messages yet. Say hello!</div>
+        ) : (
+          messages.map((msg) => {
+            const isMe = msg.userId === auth.currentUser?.uid;
+            return (
+              <div key={msg.id} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
+                <div style={{ fontSize: '10px', color: '#888', marginBottom: '2px', textAlign: isMe ? 'right' : 'left' }}>
+                  {isMe ? 'You' : (msg.username || 'User')}
+                </div>
+                <div style={{ backgroundColor: isMe ? '#1a237e' : (darkMode ? '#333' : '#f0f0f0'), color: isMe ? 'white' : text, padding: '10px 15px', borderRadius: '15px', borderBottomRightRadius: isMe ? '0' : '15px', borderBottomLeftRadius: isMe ? '15px' : '0', fontSize: '14px' }}>
+                  {msg.text}
+                </div>
               </div>
-              <div style={{ backgroundColor: isMe ? '#1a237e' : (darkMode ? '#333' : '#f0f0f0'), color: isMe ? 'white' : text, padding: '10px 15px', borderRadius: '15px', borderBottomRightRadius: isMe ? '0' : '15px', borderBottomLeftRadius: isMe ? '15px' : '0', fontSize: '14px' }}>
-                {msg.text}
-              </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
         <div ref={messagesEndRef} />
       </div>
 

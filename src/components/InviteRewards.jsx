@@ -1,48 +1,74 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../firebaseConfig';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
 export default function InviteRewards() {
   const navigate = useNavigate();
-  const [inviteCode, setInviteCode] = useState('...');
-  const [copied, setCopied] = useState(false);
+  const [userData, setUserData] = useState(null);
+  const [referredUsers, setReferredUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchCode = async () => {
-      const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
-      if (userDoc.exists()) {
-        setInviteCode(userDoc.data().inviteCode || "ERROR");
+    const fetchReferralData = async () => {
+      if (!auth.currentUser) return;
+      try {
+        const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+        if (userDoc.exists()) setUserData(userDoc.data());
+
+        const q = query(collection(db, "users"), where("referredBy", "==", auth.currentUser.uid));
+        const snap = await getDocs(q);
+        setReferredUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (error) {
+        console.error(error);
       }
+      setLoading(false);
     };
-    fetchCode();
+    fetchReferralData();
   }, []);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(inviteCode);
-    setCopied(true);
-    toast.success("Code copied to clipboard!");
-    setTimeout(() => setCopied(false), 2000);
+  const copyLink = () => {
+    if (!userData?.inviteCode) return;
+    const link = `https://syum-bet.web.app/login?ref=${userData.inviteCode}`;
+    navigator.clipboard.writeText(link);
+    toast.success("Referral link copied! Share it with friends.");
   };
 
+  if (loading) return <div style={{ textAlign: 'center', marginTop: '50px' }}>Loading...</div>;
+
   return (
-    <div style={{ maxWidth: '400px', margin: '0 auto', padding: '20px', textAlign: 'center' }}>
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px', textAlign: 'left' }}>
-        <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', marginRight: '15px' }}>←</button>
-        <h2 style={{ margin: 0 }}>Invite & Earn</h2>
+    <div style={{ maxWidth: '500px', margin: '0 auto', padding: '20px' }}>
+      <button onClick={() => navigate('/dashboard')} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', marginBottom: '20px' }}>← Back</button>
+      
+      <div style={{ backgroundColor: '#1a237e', color: 'white', padding: '30px', borderRadius: '12px', textAlign: 'center', marginBottom: '20px' }}>
+        <h2>Invite Friends & Earn</h2>
+        <p>Get 100 Coins for every friend who joins and makes a deposit!</p>
+        <div style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: '15px', borderRadius: '8px', marginTop: '20px' }}>
+          <p style={{ margin: '0 0 10px 0', fontSize: '14px' }}>Your Referral Code</p>
+          <h1 style={{ margin: 0, letterSpacing: '2px' }}>{userData?.inviteCode || 'N/A'}</h1>
+        </div>
+        <button onClick={copyLink} style={{ marginTop: '20px', padding: '12px 24px', backgroundColor: '#f59e0b', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', width: '100%' }}>
+          📋 Copy Invite Link
+        </button>
       </div>
 
-      <div style={{ fontSize: '60px', marginBottom: '10px' }}>🎁</div>
-      <h3>Invite friends & get 50 Coins</h3>
-      <p style={{ color: '#666', fontSize: '14px', marginBottom: '30px' }}>Share your code. When they sign up and use it, you instantly get 50 free coins!</p>
-
-      <div style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '12px', border: '1px dashed #1a237e' }}>
-        <p style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#666' }}>Your Unique Invite Code</p>
-        <div style={{ fontSize: '32px', fontWeight: 'bold', letterSpacing: '4px', color: '#1a237e', marginBottom: '15px' }}>{inviteCode}</div>
-        <button onClick={handleCopy} style={{ padding: '10px 24px', backgroundColor: '#1a237e', color: 'white', border: 'none', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold' }}>
-          {copied ? 'Copied!' : 'Copy Code'}
-        </button>
+      <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
+        <h3>Your Referrals ({referredUsers.length})</h3>
+        {referredUsers.length === 0 ? (
+          <p style={{ color: '#666' }}>You haven't invited anyone yet. Share your link to start earning!</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {referredUsers.map(u => (
+              <div key={u.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
+                <span>@{u.username || u.email.split('@')[0]}</span>
+                <span style={{ color: u.hasDepositedBefore ? '#4caf50' : '#f59e0b', fontWeight: 'bold' }}>
+                  {u.hasDepositedBefore ? '✅ Deposit Made' : '⏳ Waiting for Deposit'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

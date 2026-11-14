@@ -3,14 +3,13 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
 
-// Register the Service Worker for Push Notifications
+// 🚨 Kill the old Service Worker that is caching old API keys
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then((registration) => {
-      console.log('ServiceWorker registered with scope:', registration.scope);
-    }).catch((error) => {
-      console.log('ServiceWorker registration failed:', error);
-    });
+  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+    for(let registration of registrations) {
+      registration.unregister();
+      console.log('Old Service Worker unregistered successfully.');
+    }
   });
 }
 

@@ -25,6 +25,7 @@ import ForcePasswordChange from './components/ForcePasswordChange';
 import Missions from './components/Missions';
 import Lottery from './components/Lottery';
 import Friends from './components/Friends';
+import SupportChat from './components/SupportChat';
 import LiveChat from './components/LiveChat';
 import NotificationCenter from './components/NotificationCenter';
 import VerifyReceipt from './components/VerifyReceipt';
@@ -44,7 +45,8 @@ function AdminRoute({ user, isAdmin, children }) {
 function AppContent() {
   const [user, setUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
+  // 🚨 CHANGED: Start as false so the app loads instantly
+  const [loading, setLoading] = useState(false); 
   const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
   const [isMaintenance, setIsMaintenance] = useState(false);
   const [lastAnnouncement, setLastAnnouncement] = useState('');
@@ -81,7 +83,6 @@ function AppContent() {
         setIsAdmin(false);
         setNeedsPasswordChange(false);
       }
-      setLoading(false);
     });
 
     unsubSettings = onSnapshot(doc(db, "settings", "config"), (docSnap) => {
@@ -108,7 +109,7 @@ function AppContent() {
     return () => unsubscribe();
   }, [user, lastAnnouncement]);
 
-  if (loading) return <div style={{ textAlign: 'center', marginTop: '50px' }}>Loading...</div>;
+  // 🚨 REMOVED: The blocking "if (loading) return <div>Loading...</div>" line
 
   if (isMaintenance && !isAdmin && location.pathname !== '/') {
     return (
@@ -162,6 +163,7 @@ function AppContent() {
             <Link to="/dashboard" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: location.pathname === '/dashboard' ? 'white' : textColor, backgroundColor: location.pathname === '/dashboard' ? '#1a237e' : 'transparent', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>🏠 Home</Link>
             <Link to="/casino" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: location.pathname === '/casino' ? 'white' : textColor, backgroundColor: location.pathname === '/casino' ? '#1a237e' : 'transparent', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>🎰 Casino</Link>
             <Link to="/livechat" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: location.pathname === '/livechat' ? 'white' : textColor, backgroundColor: location.pathname === '/livechat' ? '#1a237e' : 'transparent', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>💬 Lobby</Link>
+            <Link to="/support" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: location.pathname === '/support' ? 'white' : textColor, backgroundColor: location.pathname === '/support' ? '#1a237e' : 'transparent', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>🎧 Support</Link>
             <Link to="/friends" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: location.pathname === '/friends' ? 'white' : textColor, backgroundColor: location.pathname === '/friends' ? '#1a237e' : 'transparent', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>👥 Friends</Link>
             <Link to="/missions" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: location.pathname === '/missions' ? 'white' : textColor, backgroundColor: location.pathname === '/missions' ? '#1a237e' : 'transparent', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>🎯 Missions</Link>
             <Link to="/lottery" style={{ padding: '12px', borderRadius: '8px', textDecoration: 'none', color: location.pathname === '/lottery' ? 'white' : textColor, backgroundColor: location.pathname === '/lottery' ? '#1a237e' : 'transparent', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>🎟️ Lottery</Link>
@@ -186,6 +188,7 @@ function AppContent() {
       <div style={{ flex: 1, marginLeft: (showNav && !isMobile) ? '250px' : '0', display: 'flex', flexDirection: 'column', minHeight: '100vh', paddingTop: (showNav && isMobile) ? '70px' : '0', paddingBottom: '40px' }}>
         {needsPasswordChange && <ForcePasswordChange onClose={() => setNeedsPasswordChange(false)} />}
         <main style={{ flex: 1, padding: location.pathname === '/admin' ? '0' : '20px' }}>
+          
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={!user ? <LoginPage /> : <Navigate to="/dashboard" />} />
@@ -197,6 +200,7 @@ function AppContent() {
             <Route path="/invite" element={<ProtectedRoute user={user}><InviteRewards /></ProtectedRoute>} />
             <Route path="/casino" element={<ProtectedRoute user={user}><CasinoHub /></ProtectedRoute>} />
             <Route path="/livechat" element={<ProtectedRoute user={user}><LiveChat /></ProtectedRoute>} />
+            <Route path="/support" element={<ProtectedRoute user={user}><SupportChat /></ProtectedRoute>} />
             <Route path="/friends" element={<ProtectedRoute user={user}><Friends /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute user={user}><UserProfile /></ProtectedRoute>} />
             <Route path="/leaderboard" element={<ProtectedRoute user={user}><Leaderboard /></ProtectedRoute>} />
@@ -206,7 +210,11 @@ function AppContent() {
             <Route path="/admin" element={<AdminRoute user={user} isAdmin={isAdmin}><AdminDashboard /></AdminRoute>} />
             <Route path="/verify" element={<VerifyEmail user={user} refreshUser={(u) => setUser({ ...u })} />} />
             <Route path="/verify-statement" element={<VerifyReceipt />} />
+            
+            {/* Catch-all: Redirects ANY broken URL (like /login.) directly to the login page */}
+            <Route path="*" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
           </Routes>
+
         </main>
         {location.pathname !== '/admin' && (
           <footer style={{ backgroundColor: darkMode ? '#121212' : '#f1f1f1', borderTop: `1px solid ${navBorder}`, padding: '10px', textAlign: 'center', fontSize: '12px', color: darkMode ? '#aaa' : '#555' }}>

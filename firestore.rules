@@ -2,23 +2,54 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper function to check if the user is an admin
+    // 1. Admin check function
     function isAdmin() {
       return request.auth != null && 
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
     }
 
-    // Users collection
+    // 2. Users Collection
     match /users/{userId} {
-      // Anyone can read users (needed for login by username, checking invite codes)
-      // Only the user themselves or an admin can write
       allow read: if true; 
       allow write: if request.auth != null && (request.auth.uid == userId || isAdmin());
     }
     
-    // For all other collections (transactions, withdrawals, etc.)
-    match /{document=**} {
+    // 3. Global Chat
+    match /global_chat/{messageId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // 4. Support Chats (Users can read/write their own, Admin can read/write all)
+    match /support_chats/{chatId} {
+      allow read, write: if request.auth != null && 
+        (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if request.auth != null;
+    }
+
+    // 5. Transactions
+    match /transactions/{txId} {
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow read: if request.auth != null && (request.auth.uid == resource.data.userId || isAdmin());
+      allow update, delete: if request.auth != null && isAdmin();
+    }
+
+    // 6. Withdrawals
+    match /withdrawals/{wdId} {
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow read: if request.auth != null && (request.auth.uid == resource.data.userId || isAdmin());
+      allow update, delete: if request.auth != null && isAdmin();
+    }
+
+    // 7. Notifications
+    match /notifications/{notifId} {
       allow read, write: if request.auth != null && (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if request.auth != null;
+    }
+    
+    // 8. Settings (Config, Game Odds, Tournaments)
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if request.auth != null && isAdmin();
     }
   }
 }

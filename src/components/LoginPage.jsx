@@ -18,7 +18,6 @@ export default function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Wrap everything in try/catch to prevent the black screen crash
     try {
       if (isLogin) {
         let loginEmail = identifier;
@@ -72,18 +71,19 @@ export default function LoginPage() {
         const userCred = await createUserWithEmailAndPassword(auth, email, password);
         await sendEmailVerification(userCred.user);
 
-        // 2. Create Firestore Doc IMMEDIATELY
+        // 2. Create Firestore Doc IMMEDIATELY with safe defaults
         const myInviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
         
         await setDoc(doc(db, "users", userCred.user.uid), {
+          uid: userCred.user.uid,         // EXTRA SAFETY
           email: email,
           username: username.toLowerCase(),
           role: "user",
-          coins: 0,
+          coins: 100,                     // Starting balance
           isBanned: false,
           inviteCode: myInviteCode,
           referredBy: referrerId || null,
-          hasChangedPassword: true,
+          hasChangedPassword: false,
           createdAt: new Date().toISOString()
         });
 

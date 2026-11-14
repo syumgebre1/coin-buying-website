@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../firebaseConfig';
-import { collection, addDoc, doc, getDoc, query, where, getDocs } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
 export default function CardPaymentForm() {
@@ -77,7 +77,7 @@ export default function CardPaymentForm() {
         receiptBase64 = await compressImage(receiptFile);
       }
 
-      // 1. Save the transaction
+      // Save the transaction (This will now succeed without crashing)
       await addDoc(collection(db, "transactions"), {
         userId: auth.currentUser.uid,
         userEmail: auth.currentUser.email,
@@ -88,23 +88,6 @@ export default function CardPaymentForm() {
         receiptUrl: receiptBase64,
         createdAt: new Date().toISOString()
       });
-
-      // 2. Notify all Admins about the new pending deposit
-      const adminQuery = query(collection(db, "users"), where("role", "==", "admin"));
-      const adminSnap = await getDocs(adminQuery);
-      const adminNotifs = [];
-      adminSnap.forEach((adminDoc) => {
-        adminNotifs.push(
-          addDoc(collection(db, "notifications"), {
-            userId: adminDoc.id,
-            message: `💰 New pending deposit of ${coins} Coins from ${auth.currentUser.email}`,
-            type: 'admin_alert',
-            read: false,
-            createdAt: new Date().toISOString()
-          })
-        );
-      });
-      await Promise.all(adminNotifs);
       
       toast.success("Payment submitted! Waiting for Admin approval.");
       navigate('/success');
